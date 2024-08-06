@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(dcpbwt)
-add_executable(${PROJECT_NAME} main.cpp)
+include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
+dd_executable(${PROJECT_NAME} main.cpp)
 
 # ---- Download submodules ---- #
 find_package(Git QUIET)
@@ -18,12 +19,8 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     endif()
 endif()
 
-
 add_subdirectory(external/DYNAMIC)
 target_include_directories(${PROJECT_NAME} PUBLIC external/DYNAMIC/include)
-target_link_libraries(${PROJECT_NAME} PRIVATE dynamic)
-include_directories(${hopscotch_map_INCLUDE})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
 add_dependencies(${PROJECT_NAME} hopscotch_map)
 
-#include_directories(${PROJECT_SOURCE_DIR}/build/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
-#message(PROJECT_SOURCE_DIR="${hopscotch_map_INCLUDE}")
