@@ -68,7 +68,7 @@ class DCPBWT{
     std::vector<packed_spsi> ones;
     std::vector<packed_spsi> combined;
     std::vector<bool> start_with_zero;
-
+    std::vector<unsigned int> num_zeros;
 
 
     // constructor
@@ -83,12 +83,12 @@ class DCPBWT{
       // build the ref panel
     }
 
-    [[nodiscard]] unsigned int run_idx(const unsigned int col, const unsigned int i) const {
+    [[nodiscard]] unsigned int get_run_idx(const unsigned int col, const unsigned int i) const {
       return combined[col].search(i+1);
     }
 
     // returns the head of a run
-    unsigned int run_head(const unsigned int col, const unsigned int run_idx) {
+    [[nodiscard]] unsigned int get_run_head(const unsigned int col, const unsigned int run_idx) const {
       if (run_idx >= combined[col].size()) {
         cerr << "Out of bounds: Accessing run that doesn't exist!\n";
         exit(EXIT_FAILURE);
@@ -99,20 +99,110 @@ class DCPBWT{
       return combined[col].psum(run_idx - 1);
     }
 
-    // returns the number of zeros and ones before ith haplotype in a column
-    pair<unsigned int, unsigned int> uv_trick(const unsigned int col, const unsigned i) {
+    bool get_run_val(const unsigned int col, const unsigned int run_idx) {
+      if (run_idx % 2 == 0) {
+        if (start_with_zero[col]) {
+          return false;
+        }
+        return true;
+      }
+      if (start_with_zero[col]) {
+        return true;
+      }
+      return false;
+    }
 
+    unsigned int lf(const unsigned int col, const unsigned int i, const bool value) {
+      if (i == M) {
+        if (value) // val is 1
+          return M;
+        return num_zeros[col]; // val is 0
+      }
+
+      unsigned int run_idx = get_run_idx(col, i);
+      unsigned int run_head = get_run_head(col, run_idx);
+      unsigned int offset = i - run_head;
+
+      if (value != get_run_val(col, run_idx)) {
+        offset = 0;
+      }
+
+      auto uv  = uv_trick(col, i);
+
+      if (value) {
+        return num_zeros[col] + uv.second + offset;
+      }
+      return uv.first + offset;
     }
 
 
+    unsigned int zeros_before(const unsigned int col, const unsigned int run_idx) {
+      unsigned int retval =0;
+      assert(((run_idx - 1) >= 0) && ((run_idx - 1) < UINT_MAX));
+      if (start_with_zero[col]) {
+        if (run_idx % 2 == 0)
+         retval = zeros[col].psum((run_idx - 2)/2);
+        else
+         retval = zeros[col].psum((run_idx - 1)/2);
+      } else {
+        if (run_idx % 2 == 0)
+         retval = zeros[col].psum((run_idx - 1)/2);
+        else
+         retval = zeros[col].psum((run_idx - 2)/2);
+      }
+      return retval;
+    }
 
+    unsigned int ones_before(const unsigned int col, const unsigned int run_idx) {
+      unsigned int retval =0;
+      assert(((run_idx - 1) >= 0) && ((run_idx - 1) < UINT_MAX));
+      if (start_with_zero[col]) {
+        if (run_idx % 2 == 0)
+         retval = ones[col].psum((run_idx - 1)/2);
+        else
+         retval = ones[col].psum((run_idx - 2)/2);
+      } else {
+        if (run_idx % 2 == 0)
+         retval = ones[col].psum((run_idx - 2)/2);
+        else
+         retval = ones[col].psum((run_idx - 1)/2);
+      }
+      return retval;
+    }
+
+    // returns the number of zeros and ones before ith haplotype in a column
+    pair<unsigned int, unsigned int> uv_trick(const unsigned int col, const unsigned i) {
+      unsigned int run_idx = get_run_idx(col, i);
+      unsigned int u = 0, v = 0;
+      if (run_idx == 0) {
+        return make_pair(0, 0);
+      }
+      if (run_idx == 1) {
+        if(start_with_zero[col]) {
+          return make_pair(zeros_before(col, run_idx), 0);
+        }
+        return make_pair(0, ones_before(col, run_idx));
+      }
+      u = zeros_before(col, run_idx);
+      v = ones_before(col, run_idx);
+      return make_pair(u, v);
+    }
+
+    void InsertSinglelHaplotype(std::vector<bool>& query) {
+      assert(query.size() == N);
+      unsigned int idx = M;
+      cout << "At col0: idx : " << idx << "\n";
+      for(unsigned int col = 1; col < query.size(); ++col) {
+        idx = lf(col-1, idx, query[col-1]);
+        cout << "At col" << col << " idx: " << idx << "\n";
+        // Insert(col, idx, query[col]);
+        // update all auxiliary data structures
+      }
+    }
 
     // Build the reference panel
     void Build (std::vector<std::vector<bool>>& alleles){
       // TODO: NEED TO implement UPDATE Phi data structures
-      packed_spsi temp_zeros;
-      packed_spsi temp_ones;
-      packed_spsi temp_combined;
 
       vector<int> u, v;
       vector<int> freq;
@@ -124,6 +214,9 @@ class DCPBWT{
       std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
 
       while (col < N) {
+        packed_spsi temp_zeros;
+        packed_spsi temp_ones;
+        packed_spsi temp_combined;
         for (int i = 0; i < M; ++i) {
           if (i == 0) {
             if (alleles[col][prefix_arr[i]]) { // allele: 1
@@ -172,10 +265,10 @@ class DCPBWT{
             }
           }
         }
-
         combined.push_back(temp_combined);
         zeros.push_back(temp_zeros);
         ones.push_back(temp_ones);
+        num_zeros.push_back(u.size());
 
         total_runs += freq.size();
         // next col prefix arr
