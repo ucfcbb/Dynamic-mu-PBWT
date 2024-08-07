@@ -1,4 +1,6 @@
 #include <iostream>
+#include <getopt.h>
+
 #include "dcpbwt.h"
 
 
@@ -15,12 +17,12 @@ int main(int argc, char** argv){
         PrintHelp();
         exit(EXIT_SUCCESS);
     }
-    std::string ref_vcf_input = "";
-    std::string output = "";
+    std::string ref_vcf_input;
+    std::string output;
     bool verbose = false;
 
-    int c;
-    while (1){
+    int c = 0;
+    while (true){
         static struct option long_options[] = {
                 {"input",   required_argument, nullptr, 'i'},
                 {"verbose",   no_argument, nullptr, 'v'},
@@ -51,14 +53,11 @@ int main(int argc, char** argv){
         }
     }
 
-    DCPBWT dcpbwt(ref_vcf_input.c_str());
-    ReadVCF(ref_vcf_input.c_str());
-    std::cout << "Hello world!\n" ;
-    packed_spsi my_spsi;
-    my_spsi.push_back(10);
-    my_spsi.push_back(20);
-    my_spsi.push_back(30);
-
-    std::cout << my_spsi.at(2) << "\n";
+    DCPBWT dcpbwt(ref_vcf_input, verbose);
+    cout << dcpbwt.combined[0].size() << "\n";
+    cout << dcpbwt.run_head(0, 0) << "\n";
+    cout << dcpbwt.run_head(0, 1) << "\n";
+    cout << dcpbwt.run_head(0, 2) << "\n";
+    cout << dcpbwt.run_head(0, 3) << "\n";
     return (EXIT_SUCCESS);
 }
