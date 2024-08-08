@@ -188,16 +188,108 @@ class DCPBWT{
       return make_pair(u, v);
     }
 
+    void Insert(const unsigned int col, const unsigned i, const bool allele) {
+      // Inserting allele at the bottom
+      if (i == M) {
+        if (get_run_val(col, get_run_idx(col, i-1)) != allele) {
+          combined[col].push_back(1);
+          if (allele) {
+            ones[col].push_back(1);
+          } else {
+            zeros[col].push_back(1);
+            ++num_zeros[col];
+          }
+        } else {
+          combined[col].increment(combined[col].size()-1, 1);
+          if (allele) {
+            ones[col].increment(ones[col].size() - 1, 1);
+          } else {
+            zeros[col].increment(zeros[col].size() - 1, 1);
+            ++num_zeros[col];
+          }
+        }
+        return;
+      }
+
+      // get run index and run value
+      unsigned int run_idx = get_run_idx(col, i);
+      bool run_value = get_run_val(col, run_idx);
+      unsigned int run_head = get_run_head(col, run_idx);
+
+      // for insertions at the boundary of runs
+      if (run_head == i) {
+        if (run_value != allele) {
+          --run_idx;
+          combined[col].increment(run_idx, 1);
+          if(allele) {
+            ones[col].increment(run_idx/2, 1);
+          } else {
+            zeros[col].increment(run_idx/2, 1);
+            ++num_zeros[col];
+          }
+          return;
+        }
+      }
+
+      // if run value is different from the allele
+      if (run_value == allele) {
+        combined[col].increment(run_idx, 1);
+        if(allele) {
+          ones[col].increment(run_idx/2, 1);
+        } else {
+          zeros[col].increment(run_idx/2, 1);
+          ++num_zeros[col];
+        }
+        return;
+      }
+
+      // Inserting different allele at the beginning
+      if (i == 0) {
+        combined[col].insert(i, 1);
+        if (allele) {
+          ones[col].insert(i, 1);
+        } else {
+          zeros[col].insert(i, 1);
+          start_with_zero[col] = true;
+          ++num_zeros[col];
+        }
+        return;
+      }
+
+
+      // split insertion in the middle
+      unsigned int left_rem = i - run_head;
+      unsigned int right_rem = combined[col].at(run_idx) - left_rem;
+      combined[col].set(run_idx, left_rem);
+      combined[col].insert(run_idx + 1, 1);
+      combined[col].insert(run_idx + 2, right_rem);
+      unsigned int  new_idx = run_idx/2 + 1;
+      if (allele) {
+        assert(new_idx <= ones.size());
+        ones[col].insert(new_idx, 1);
+      } else {
+        assert(new_idx <= zeros.size());
+        zeros[col].insert(new_idx, 1);
+        ++num_zeros[col];
+      }
+    }
+
     void InsertSinglelHaplotype(std::vector<bool>& query) {
       assert(query.size() == N);
-      unsigned int idx = M;
-      cout << "At col0: idx : " << idx << "\n";
+      vector<unsigned int> insertion_indices(N,0);
+      insertion_indices[0] = M;
+
+      // calculate insertion indices
       for(unsigned int col = 1; col < query.size(); ++col) {
-        idx = lf(col-1, idx, query[col-1]);
-        cout << "At col" << col << " idx: " << idx << "\n";
-        // Insert(col, idx, query[col]);
-        // update all auxiliary data structures
+        insertion_indices[col] = lf(col-1, insertion_indices[col-1], query[col-1]);
       }
+      // perform insertion
+      for(unsigned int col = 0; col < query.size(); ++col) {
+        Insert(col, insertion_indices[col], query[col]);
+      }
+
+      // increment total # of haplotypes
+      ++M;
     }
 
     // Build the reference panel
