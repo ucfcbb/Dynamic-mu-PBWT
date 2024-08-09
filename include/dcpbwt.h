@@ -67,6 +67,9 @@ class DCPBWT{
     std::vector<packed_spsi> zeros;
     std::vector<packed_spsi> ones;
     std::vector<packed_spsi> combined;
+    std::vector<packed_spsi> pref_samples_beg;
+    std::vector<packed_spsi> pref_samples_end;
+
     std::vector<bool> start_with_zero;
     std::vector<unsigned int> num_zeros;
 
@@ -135,7 +138,6 @@ class DCPBWT{
       return uv.first + offset;
     }
 
-
     unsigned int zeros_before(const unsigned int col, const unsigned int run_idx) {
       unsigned int retval =0;
       assert(((run_idx - 1) >= 0) && ((run_idx - 1) < UINT_MAX));
@@ -199,6 +201,8 @@ class DCPBWT{
             zeros[col].push_back(1);
             ++num_zeros[col];
           }
+          // insert new run head at the bottom
+          pref_samples_beg[col].push_back(M);
         } else {
           combined[col].increment(combined[col].size()-1, 1);
           if (allele) {
@@ -229,9 +233,11 @@ class DCPBWT{
           }
           return;
         }
+        // change to new run head
+        pref_samples_beg[col].set(run_idx, M);
       }
 
-      // if run value is different from the allele
+      // if run value is same as the allele
       if (run_value == allele) {
         combined[col].increment(run_idx, 1);
         if(allele) {
@@ -239,6 +245,10 @@ class DCPBWT{
         } else {
           zeros[col].increment(run_idx/2, 1);
           ++num_zeros[col];
+        }
+
+        if (i == 0) {
+          pref_samples_beg[col].set(0, M);
         }
         return;
       }
@@ -253,9 +263,9 @@ class DCPBWT{
           start_with_zero[col] = true;
           ++num_zeros[col];
         }
+        pref_samples_beg[col].insert(0, M);
         return;
       }
-
 
       // split insertion in the middle
       unsigned int left_rem = i - run_head;
@@ -264,6 +274,12 @@ class DCPBWT{
       combined[col].insert(run_idx + 1, 1);
       combined[col].insert(run_idx + 2, right_rem);
       unsigned int  new_idx = run_idx/2 + 1;
+
+      // TODO
+      // How to find the sample beg of the right half of the split run i.e.
+      // Alleles: 1 1 0 0 0 (1) 0 0 0 1 1 1
+      // PrefBeg: 3   5      x  ?     8
+      // perhaps need to implement phi first and then use phi to get that pref value
       if (allele) {
         assert(new_idx <= ones.size());
         ones[col].insert(new_idx, 1);
@@ -309,6 +325,8 @@ class DCPBWT{
         packed_spsi temp_zeros;
         packed_spsi temp_ones;
         packed_spsi temp_combined;
+        packed_spsi temp_sample_beg;
+        packed_spsi temp_sample_end;
         for (int i = 0; i < M; ++i) {
           if (i == 0) {
             if (alleles[col][prefix_arr[i]]) { // allele: 1
@@ -318,6 +336,7 @@ class DCPBWT{
               u.push_back(prefix_arr[i]);
               start_with_zero.push_back(true);
             }
+            temp_sample_beg.push_back(prefix_arr[i]);
             prev_allele = alleles[col][prefix_arr[i]];
             cnt = 1;
             continue;
@@ -327,15 +346,20 @@ class DCPBWT{
             freq.push_back(cnt);
             prev_allele = alleles[col][prefix_arr[i]];
             cnt = 1;
+            temp_sample_beg.push_back(prefix_arr[i]);
+            temp_sample_end.push_back(prefix_arr[i - 1]);
           } else {
             ++cnt;
           }
+
           if (alleles[col][prefix_arr[i]]) {
             v.push_back(prefix_arr[i]);
           } else {
             u.push_back(prefix_arr[i]);
           }
         }
+        temp_sample_end.push_back(prefix_arr[M-1]);
+
         // edge case
         if (cnt > 0)
           freq.push_back(cnt);
@@ -357,10 +381,15 @@ class DCPBWT{
             }
           }
         }
+
+        assert(temp_combined.size() == temp_sample_beg.size());
+        assert(temp_combined.size() == temp_sample_end.size());
         combined.push_back(temp_combined);
         zeros.push_back(temp_zeros);
         ones.push_back(temp_ones);
         num_zeros.push_back(u.size());
+        pref_samples_beg.push_back(temp_sample_beg);
+        pref_samples_end.push_back(temp_sample_end);
 
         total_runs += freq.size();
         // next col prefix arr
