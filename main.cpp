@@ -12,6 +12,28 @@ void PrintHelp() {
     std::cout << "  -h, --help\t show this help message and exit" << std::endl;
 }
 
+void Test_UV(DCPBWT& dcpbwt) {
+    unsigned int query_idx = 0;
+    auto uv = dcpbwt.uv_trick(0, query_idx);
+    cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
+
+    query_idx = 5;
+    uv = dcpbwt.uv_trick(0, query_idx);
+    cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
+
+    query_idx = 6;
+    uv = dcpbwt.uv_trick(0, query_idx);
+    cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
+
+    query_idx = 10;
+    uv = dcpbwt.uv_trick(0, query_idx);
+    cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
+
+    query_idx = 17;
+    uv = dcpbwt.uv_trick(0, query_idx);
+    cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
+}
+
 int main(int argc, char** argv){
     if (argc == 1) {
         PrintHelp();
@@ -54,10 +76,9 @@ int main(int argc, char** argv){
     }
 
     DCPBWT dcpbwt(ref_vcf_input, verbose);
-    cout << dcpbwt.combined[0].size() << "\n";
-    cout << dcpbwt.run_head(0, 0) << "\n";
-    cout << dcpbwt.run_head(0, 1) << "\n";
-    cout << dcpbwt.run_head(0, 2) << "\n";
-    cout << dcpbwt.run_head(0, 3) << "\n";
+    Test_UV(dcpbwt);
+
+    vector<bool> query{false, true, false, false, true, false, true, false, false, false, true, true, true, false, true};
+    dcpbwt.InsertSinglelHaplotype(query);
     return (EXIT_SUCCESS);
 }

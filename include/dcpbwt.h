@@ -8,6 +8,8 @@
 #include <sstream>
 
 #include "dynamic/dynamic.hpp"
+#include "phi.h"
+#include "dcpbwt_column.h"
 
 using namespace dyn;
 using namespace std;
@@ -64,15 +66,8 @@ class DCPBWT{
   public:
     unsigned int M; // #haplotypes
     unsigned int N; // #sites
-    std::vector<packed_spsi> zeros;
-    std::vector<packed_spsi> ones;
-    std::vector<packed_spsi> combined;
-    std::vector<packed_spsi> pref_samples_beg;
-    std::vector<packed_spsi> pref_samples_end;
-
-    std::vector<bool> start_with_zero;
-    std::vector<unsigned int> num_zeros;
-
+    std::vector<dcpbwt_column> columns;
+    phi_ds* phi=nullptr;
 
     // constructor
     DCPBWT(std::string ref_vcf_file, bool verbose){
@@ -81,35 +76,36 @@ class DCPBWT{
       ReadVCF(ref_vcf_file, alleles);
       N = alleles.size();
       M = alleles[0].size();
+
       Build(alleles);
 
       // build the ref panel
     }
 
     [[nodiscard]] unsigned int get_run_idx(const unsigned int col, const unsigned int i) const {
-      return combined[col].search(i+1);
+      return columns[col].combined.search(i+1);
     }
 
     // returns the head of a run
     [[nodiscard]] unsigned int get_run_head(const unsigned int col, const unsigned int run_idx) const {
-      if (run_idx >= combined[col].size()) {
+      if (run_idx >= columns[col].combined.size()) {
         cerr << "Out of bounds: Accessing run that doesn't exist!\n";
         exit(EXIT_FAILURE);
       }
       if (run_idx == 0) {
         return 0;
       }
-      return combined[col].psum(run_idx - 1);
+      return columns[col].combined.psum(run_idx - 1);
     }
 
     bool get_run_val(const unsigned int col, const unsigned int run_idx) {
       if (run_idx % 2 == 0) {
-        if (start_with_zero[col]) {
+        if (columns[col].start_with_zero) {
           return false;
         }
         return true;
       }
-      if (start_with_zero[col]) {
+      if (columns[col].start_with_zero) {
         return true;
       }
       return false;
@@ -119,7 +115,7 @@ class DCPBWT{
       if (i == M) {
         if (value) // val is 1
           return M;
-        return num_zeros[col]; // val is 0
+        return columns[col].num_zeros; // val is 0
       }
 
       unsigned int run_idx = get_run_idx(col, i);
@@ -133,7 +129,7 @@ class DCPBWT{
       auto uv  = uv_trick(col, i);
 
       if (value) {
-        return num_zeros[col] + uv.second + offset;
+        return columns[col].num_zeros + uv.second + offset;
       }
       return uv.first + offset;
     }
@@ -141,16 +137,16 @@ class DCPBWT{
     unsigned int zeros_before(const unsigned int col, const unsigned int run_idx) {
       unsigned int retval =0;
       assert(((run_idx - 1) >= 0) && ((run_idx - 1) < UINT_MAX));
-      if (start_with_zero[col]) {
+      if (columns[col].start_with_zero) {
         if (run_idx % 2 == 0)
-         retval = zeros[col].psum((run_idx - 2)/2);
+         retval = columns[col].zeros.psum((run_idx - 2)/2);
         else
-         retval = zeros[col].psum((run_idx - 1)/2);
+         retval = columns[col].zeros.psum((run_idx - 1)/2);
       } else {
         if (run_idx % 2 == 0)
-         retval = zeros[col].psum((run_idx - 1)/2);
+         retval = columns[col].zeros.psum((run_idx - 1)/2);
         else
-         retval = zeros[col].psum((run_idx - 2)/2);
+         retval = columns[col].zeros.psum((run_idx - 2)/2);
       }
       return retval;
     }
@@ -158,16 +154,16 @@ class DCPBWT{
     unsigned int ones_before(const unsigned int col, const unsigned int run_idx) {
       unsigned int retval =0;
       assert(((run_idx - 1) >= 0) && ((run_idx - 1) < UINT_MAX));
-      if (start_with_zero[col]) {
+      if (columns[col].start_with_zero) {
         if (run_idx % 2 == 0)
-         retval = ones[col].psum((run_idx - 1)/2);
+         retval = columns[col].ones.psum((run_idx - 1)/2);
         else
-         retval = ones[col].psum((run_idx - 2)/2);
+         retval = columns[col].ones.psum((run_idx - 2)/2);
       } else {
         if (run_idx % 2 == 0)
-         retval = ones[col].psum((run_idx - 2)/2);
+         retval = columns[col].ones.psum((run_idx - 2)/2);
         else
-         retval = ones[col].psum((run_idx - 1)/2);
+         retval = columns[col].ones.psum((run_idx - 1)/2);
       }
       return retval;
     }
@@ -180,7 +176,7 @@ class DCPBWT{
         return make_pair(0, 0);
       }
       if (run_idx == 1) {
-        if(start_with_zero[col]) {
+        if(columns[col].start_with_zero) {
           return make_pair(zeros_before(col, run_idx), 0);
         }
         return make_pair(0, ones_before(col, run_idx));
@@ -194,22 +190,22 @@ class DCPBWT{
       // Inserting allele at the bottom
       if (i == M) {
         if (get_run_val(col, get_run_idx(col, i-1)) != allele) {
-          combined[col].push_back(1);
+          columns[col].combined.push_back(1);
           if (allele) {
-            ones[col].push_back(1);
+            columns[col].ones.push_back(1);
           } else {
-            zeros[col].push_back(1);
-            ++num_zeros[col];
+            columns[col].zeros.push_back(1);
+            ++columns[col].num_zeros;
           }
           // insert new run head at the bottom
-          pref_samples_beg[col].push_back(M);
+          columns[col].pref_samples_beg.push_back(M);
         } else {
-          combined[col].increment(combined[col].size()-1, 1);
+          columns[col].combined.increment(columns[col].combined.size()-1, 1);
           if (allele) {
-            ones[col].increment(ones[col].size() - 1, 1);
+            columns[col].ones.increment(columns[col].ones.size() - 1, 1);
           } else {
-            zeros[col].increment(zeros[col].size() - 1, 1);
-            ++num_zeros[col];
+            columns[col].zeros.increment(columns[col].zeros.size() - 1, 1);
+            ++columns[col].num_zeros;
           }
         }
         return;
@@ -224,55 +220,55 @@ class DCPBWT{
       if (run_head == i) {
         if (run_value != allele) {
           --run_idx;
-          combined[col].increment(run_idx, 1);
+          columns[col].combined.increment(run_idx, 1);
           if(allele) {
-            ones[col].increment(run_idx/2, 1);
+            columns[col].ones.increment(run_idx/2, 1);
           } else {
-            zeros[col].increment(run_idx/2, 1);
-            ++num_zeros[col];
+            columns[col].zeros.increment(run_idx/2, 1);
+            ++columns[col].num_zeros;
           }
           return;
         }
         // change to new run head
-        pref_samples_beg[col].set(run_idx, M);
+        columns[col].pref_samples_beg.set(run_idx, M);
       }
 
       // if run value is same as the allele
       if (run_value == allele) {
-        combined[col].increment(run_idx, 1);
+        columns[col].combined.increment(run_idx, 1);
         if(allele) {
-          ones[col].increment(run_idx/2, 1);
+          columns[col].ones.increment(run_idx/2, 1);
         } else {
-          zeros[col].increment(run_idx/2, 1);
-          ++num_zeros[col];
+          columns[col].zeros.increment(run_idx/2, 1);
+          ++columns[col].num_zeros;
         }
 
         if (i == 0) {
-          pref_samples_beg[col].set(0, M);
+          columns[col].pref_samples_beg.set(0, M);
         }
         return;
       }
 
       // Inserting different allele at the beginning
       if (i == 0) {
-        combined[col].insert(i, 1);
+        columns[col].combined.insert(i, 1);
         if (allele) {
-          ones[col].insert(i, 1);
+          columns[col].ones.insert(i, 1);
         } else {
-          zeros[col].insert(i, 1);
-          start_with_zero[col] = true;
-          ++num_zeros[col];
+          columns[col].zeros.insert(i, 1);
+          columns[col].start_with_zero = true;
+          ++columns[col].num_zeros;
         }
-        pref_samples_beg[col].insert(0, M);
+        columns[col].pref_samples_beg.insert(0, M);
         return;
       }
 
       // split insertion in the middle
       unsigned int left_rem = i - run_head;
-      unsigned int right_rem = combined[col].at(run_idx) - left_rem;
-      combined[col].set(run_idx, left_rem);
-      combined[col].insert(run_idx + 1, 1);
-      combined[col].insert(run_idx + 2, right_rem);
+      unsigned int right_rem = columns[col].combined.at(run_idx) - left_rem;
+      columns[col].combined.set(run_idx, left_rem);
+      columns[col].combined.insert(run_idx + 1, 1);
+      columns[col].combined.insert(run_idx + 2, right_rem);
       unsigned int  new_idx = run_idx/2 + 1;
 
       // TODO
@@ -281,12 +277,12 @@ class DCPBWT{
       // PrefBeg: 3   5      x  ?     8
       // perhaps need to implement phi first and then use phi to get that pref value
       if (allele) {
-        assert(new_idx <= ones.size());
-        ones[col].insert(new_idx, 1);
+        assert(new_idx <= columns[col].ones.size());
+        columns[col].ones.insert(new_idx, 1);
       } else {
-        assert(new_idx <= zeros.size());
-        zeros[col].insert(new_idx, 1);
-        ++num_zeros[col];
+        assert(new_idx <= columns[col].zeros.size());
+        columns[col].zeros.insert(new_idx, 1);
+        ++columns[col].num_zeros;
       }
     }
 
@@ -321,20 +317,25 @@ class DCPBWT{
       vector<int> prefix_arr(M, 0);
       std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
 
+      vector<vector<unsigned int>> sites_where_sample_beg(M);
+      vector<vector<unsigned int>> sites_where_sample_end(M);
+
       while (col < N) {
         packed_spsi temp_zeros;
         packed_spsi temp_ones;
         packed_spsi temp_combined;
         packed_spsi temp_sample_beg;
         packed_spsi temp_sample_end;
+        bool start_with_zero = false;
+
         for (int i = 0; i < M; ++i) {
+          // first allele
           if (i == 0) {
             if (alleles[col][prefix_arr[i]]) { // allele: 1
               v.push_back(prefix_arr[i]);
-              start_with_zero.push_back(false);
             } else { // allele: 0
               u.push_back(prefix_arr[i]);
-              start_with_zero.push_back(true);
+              start_with_zero = true;
             }
             temp_sample_beg.push_back(prefix_arr[i]);
             prev_allele = alleles[col][prefix_arr[i]];
@@ -367,7 +368,7 @@ class DCPBWT{
         // populate dynamic data structures
         for(int i = 0; i < freq.size(); ++i) {
           temp_combined.push_back(freq[i]);
-          if (start_with_zero[col]) {
+          if (start_with_zero) {
             if (i % 2 == 0) {
               temp_zeros.push_back(freq[i]);
             } else {
@@ -384,12 +385,18 @@ class DCPBWT{
 
         assert(temp_combined.size() == temp_sample_beg.size());
         assert(temp_combined.size() == temp_sample_end.size());
-        combined.push_back(temp_combined);
-        zeros.push_back(temp_zeros);
-        ones.push_back(temp_ones);
-        num_zeros.push_back(u.size());
-        pref_samples_beg.push_back(temp_sample_beg);
-        pref_samples_end.push_back(temp_sample_end);
+
+        for(auto i = 0; i < temp_sample_beg.size(); ++i) {
+          sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
+          sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
+        }
+
+        // build each column
+        dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                           (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
+                           start_with_zero, u.size());
+        columns.emplace_back(coln);
+
 
         total_runs += freq.size();
         // next col prefix arr
@@ -400,7 +407,12 @@ class DCPBWT{
         u.clear();
         v.clear();
         freq.clear();
-      }
+      } // run-through all sites
+
+      assert(columns.size() == N);
+      // build phi data-structure
+      this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, false);
+
       assert(col == N);
       total_runs += freq.size();
       cout << "Avg runs = " << static_cast<float>(total_runs)/N << "\n";
