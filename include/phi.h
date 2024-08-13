@@ -14,39 +14,31 @@
 using namespace dyn;
 
 class phi_ds{
-private:
     unsigned int total_haplotypes{};
     unsigned int total_sites{};
 public:
     /**
-     * sparse dynamic sparse bitvectors for phi function
+     * dynamic sparse bitvectors for phi function
      */
     std::vector<suc_bv> phi_vec;
 
     /**
-     * panel of dynamic sparse bitvectors for phi_inv function
+     * dynamic sparse bitvectors for phi_inv function
      */
     std::vector<suc_bv> phi_inv_vec;
 
 
     /**
-     * @brief compressed int vector for prefix samples used by phi function
+     * int vector for prefix samples used by phi function
      */
     std::vector<packed_spsi> phi_supp;
 
     /**
-     * @brief compressed int vector for prefix samples used by phi_inv function
+     * int vector for prefix samples used by phi_inv function
      */
     std::vector<packed_spsi> phi_inv_supp;
 
-    /**
-     * @brief default constructor
-     */
     phi_ds() = default;
-
-    /**
-     * @brief default destructor
-     */
     virtual ~phi_ds() = default;
 
     /**
@@ -113,8 +105,6 @@ public:
                     // phi_supp_tmp_l[cols[i].sample_beg[j]].push_back(0);
                 } else {
                     this->phi_supp[columns[col].pref_samples_beg[j]].push_back(columns[col].pref_samples_end[j - 1]);
-                    // phi_supp_tmp[cols[i].sample_beg[j]].push_back(
-                    //         cols[i].sample_end[j - 1]);
                     // phi_supp_tmp_l[cols[i].sample_beg[j]].push_back(
                     //         cols[i].sample_beg_lcp[j]);
                 }
