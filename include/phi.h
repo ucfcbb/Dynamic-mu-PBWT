@@ -208,10 +208,7 @@ public:
     // }
 
     /**
-     * @brief function to obtain size in bytes of the phi/phi_inv support data
-     * structure
-     * @param verbose bool for extra prints
-     * @return size in bytes
+     * function to obtain size in bytes of the phi/phi_inv support data
     */
     unsigned long long size_in_bytes(bool verbose = false) {
         unsigned long long size = 0;
@@ -221,18 +218,17 @@ public:
             size += phi_supp[i].bit_size();
             size += phi_inv_supp[i].bit_size();
         }
+        // convert to bytes
+        size /=8;
         if (verbose) {
-            std::cout << "phi support: " << size << " bits\n";
-            std::cout << "phi support: " << static_cast<double>(size)/8 << " bytes\n";
+            std::cout << "phi support: " << size << " bytes\n";
         }
         return size;
     }
 
     /**
-     * @brief function to obtain size in megabytes of the phi/phi_inv support data
+     * function to obtain size in megabytes of the phi/phi_inv support data
      * structure
-     * @param verbose bool for extra prints
-     * @return size in megabytes
      */
     // double size_in_mega_bytes(bool verbose = false) {
     //     double size_panels = 0;
