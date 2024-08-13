@@ -213,24 +213,20 @@ public:
      * @param verbose bool for extra prints
      * @return size in bytes
     */
-    // unsigned long long size_in_bytes(bool verbose = false) {
-    //     unsigned long long size = 0;
-    //     for (unsigned int i = 0; i < this->phi_vec.size(); ++i) {
-    //         size += sdsl::size_in_bytes(phi_vec[i]);
-    //         size += sdsl::size_in_bytes(phi_inv_vec[i]);
-    //         size += sdsl::size_in_bytes(phi_rank[i]);
-    //         size += sdsl::size_in_bytes(phi_select[i]);
-    //         size += sdsl::size_in_bytes(phi_inv_rank[i]);
-    //         size += sdsl::size_in_bytes(phi_inv_select[i]);
-    //         size += sdsl::size_in_bytes(phi_supp[i]);
-    //         size += sdsl::size_in_bytes(phi_inv_supp[i]);
-    //         size += sdsl::size_in_bytes(phi_supp_l[i]);
-    //     }
-    //     if (verbose) {
-    //         std::cout << "phi support: " << size << " bytes\n";
-    //     }
-    //     return size;
-    // }
+    unsigned long long size_in_bytes(bool verbose = false) {
+        unsigned long long size = 0;
+        for (unsigned int i = 0; i < this->phi_vec.size(); ++i) {
+            size += phi_vec[i].bit_size();
+            size += phi_inv_vec[i].bit_size();
+            size += phi_supp[i].bit_size();
+            size += phi_inv_supp[i].bit_size();
+        }
+        if (verbose) {
+            std::cout << "phi support: " << size << " bits\n";
+            std::cout << "phi support: " << static_cast<double>(size)/8 << " bytes\n";
+        }
+        return size;
+    }
 
     /**
      * @brief function to obtain size in megabytes of the phi/phi_inv support data

@@ -19,6 +19,8 @@ public:
     packed_spsi pref_samples_beg;
     packed_spsi pref_samples_end;
     bool start_with_zero;
+    // TODO: don't need this, as zeros can get this number
+    // TODO: For now keeping it for the sake of ease
     unsigned int num_zeros;
 
     dcpbwt_column(packed_spsi zeros, packed_spsi ones, packed_spsi combined, packed_spsi pref_samples_beg, packed_spsi pref_samples_end,

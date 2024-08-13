@@ -449,9 +449,11 @@ class DCPBWT{
       int col = 0;
       int cnt = 1;
       bool prev_allele = false;
+      // TODO: Possible optimization using sdsl int vec
       vector<int> prefix_arr(M, 0);
       std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
 
+      // TODO: Possible optimization using sdsl int vec
       vector<vector<unsigned int>> sites_where_sample_beg(M);
       vector<vector<unsigned int>> sites_where_sample_end(M);
 
@@ -547,13 +549,9 @@ class DCPBWT{
       assert(columns.size() == N);
       // build phi data-structure
       this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, false);
-
-      for(int i = 0; i < this->phi->phi_inv_supp[19].size(); ++i) {
-        std::cout << this->phi->phi_inv_supp[19].at(i) << "\n";
-      }
-
       assert(col == N);
       total_runs += freq.size();
+      cout << "Phi support size (in bits) = " << this->phi->size_in_bytes(false) << "\n";
       cout << "Avg runs = " << static_cast<float>(total_runs)/N << "\n";
     }
 };
