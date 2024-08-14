@@ -151,12 +151,12 @@ class DCPBWT{
       if (columns[col].start_with_zero){ // the second run at index 1 will be run of ones
         ridx = 1;
       }
-      return {ind, columns[col].pref_samples_beg[ridx]};
+      return {ind, columns[col].pref_samples_beg.at(ridx)};
     }
 
      std::pair<int,int> w_mod(const unsigned int i, const unsigned int col, const bool val, const unsigned int pref_val){
         if (i == this->M) {return column_end_lf(col, val);}
-        const unsigned int run_idx = get_run_idx(i, col);
+        const unsigned int run_idx = get_run_idx(col, i);
 
         if (const bool rval = get_run_val(col, run_idx); rval == val){
           return {lf(col, i, val), pref_val};
@@ -242,10 +242,11 @@ class DCPBWT{
       return make_pair(u, v);
     }
 
-    void Insert(const unsigned int col, const unsigned i, const unsigned int hap_id, bool allele) {
+    void Insert(const unsigned int col, const unsigned i, const unsigned int hap_id, bool allele, packed_spsi& temp_supp, packed_spsi& temp_inv_supp) {
       // assumes Non-empty ref panel (i.e. a panel is built prior to insertion)
       // Inserting allele at the bottom of a column
       if (i == M) {
+        // inserting a new run
         if (get_run_val(col, get_run_idx(col, i-1)) != allele) {
           columns[col].combined.push_back(1);
           if (allele) {
@@ -254,6 +255,13 @@ class DCPBWT{
             columns[col].zeros.push_back(1);
             ++columns[col].num_zeros;
           }
+
+          // get old "end of run" hap and update it's bottom
+          assert (columns[col].pref_samples_end.size() > 0);
+          auto old_bottom_hap = columns[col].pref_samples_end.at(columns[col].pref_samples_end.size() - 1);
+          auto col_rank = this->phi->phi_inv_vec[old_bottom_hap].rank1(col);
+          this->phi->phi_inv_supp[old_bottom_hap].set(col_rank, M);
+
           // insert new run head at the bottom
           columns[col].pref_samples_beg.push_back(M);
           columns[col].pref_samples_end.push_back(M);
@@ -262,9 +270,11 @@ class DCPBWT{
           this->phi->phi_vec[M].set(col, true);
           this->phi->phi_inv_vec[M].set(col, true);
 
-          this->phi->phi_supp[M].push_back(columns[col].pref_samples_end[columns[col].pref_samples_end.size() - 2]);
-          this->phi->phi_inv_supp[M].push_back(UINT_MAX);
-        } else {
+          temp_supp.push_back(old_bottom_hap);
+          std::cout << "size of temp-supp = " << temp_supp.size() << " , at 0 = " << temp_supp.at(0) << "\n";
+          // UINT_MAX represents nothing below it
+          temp_inv_supp.push_back(UINT_MAX);
+        } else { // modifying end of existing run
           columns[col].combined.increment(columns[col].combined.size()-1, 1);
           if (allele) {
             columns[col].ones.increment(columns[col].ones.size() - 1, 1);
@@ -273,15 +283,16 @@ class DCPBWT{
             ++columns[col].num_zeros;
           }
           // unset the bit for previous haplotype that was at the end of run in this column
-          auto rank = this->phi->phi_inv_vec[columns[col].pref_samples_end[columns[col].pref_samples_end.size()-1]].rank1(col);
-          this->phi->phi_inv_supp[columns[col].pref_samples_end[columns[col].pref_samples_end.size()-1]].remove(rank);
-          this->phi->phi_inv_vec[columns[col].pref_samples_end[columns[col].pref_samples_end.size()-1]].set(col, false);
+          auto old_bottom_hap = columns[col].pref_samples_end.at(columns[col].pref_samples_end.size() - 1);
+          auto col_rank = this->phi->phi_inv_vec[old_bottom_hap].rank1(col);
+          this->phi->phi_inv_supp[old_bottom_hap].remove(col_rank);
+          this->phi->phi_inv_vec[old_bottom_hap].set(col, false);
 
           // replace the pref val at end of a run for column 'col' to M
           columns[col].pref_samples_end.set(columns[col].pref_samples_end.size() - 1, M);
           // update phi structure
           this->phi->phi_inv_vec[M].set(col, true);
-          this->phi->phi_inv_supp[M].push_back(UINT_MAX);
+          temp_inv_supp.push_back(UINT_MAX);
         }
         return;
       }
@@ -290,66 +301,69 @@ class DCPBWT{
       if (i == 0) {
         if (columns[col].start_with_zero) {
           if (allele) { // insert 1
-            // TODO: create_new_run();
+            // TODO: refactor to insert_new_run();
             columns[col].combined.insert(i, 1);
             columns[col].ones.insert(i, 1);
             columns[col].start_with_zero = false;
 
             // update for the haplotype that's at the top
-            this->phi->phi_supp[columns[col].pref_samples_beg[i]].set(0, M);
+            auto old_top_hap = hap_id;
+            this->phi->phi_supp[old_top_hap].set(i, M);
 
-            // existing top is below the inserted haplotype
-            this->phi->phi_inv_supp[M].push_back(columns[col].pref_samples_beg[i]);
-
+            // update the data-structures for the inserted haplotype
+            // update run beg/end pref samples
             columns[col].pref_samples_beg.insert(i, M);
             columns[col].pref_samples_end.insert(i, M);
 
-            // phi bit-vec support
+            // update phi support data structures
             this->phi->phi_vec[M].set(col, true);
             this->phi->phi_inv_vec[M].set(col, true);
-            this->phi->phi_supp[M].push_back(UINT_MAX);
+            // nothing above inserted hap
+            temp_supp.push_back(UINT_MAX);
+            temp_inv_supp.push_back(old_top_hap);
 
           } else { // insert 0
             columns[col].combined.increment(i, 1);
             columns[col].zeros.increment(i, 1);
             ++columns[col].num_zeros;
 
-            // update(unset) old sample beg
-            auto old_top_hap = columns[col].pref_samples_beg.at(0);
-            auto rank = this->phi->phi_vec[old_top_hap].rank1(col);
-            this->phi->phi_supp[old_top_hap].remove(rank);
+            // unset old sample beg
+            auto old_top_hap = hap_id;
+            auto col_rank = this->phi->phi_vec[old_top_hap].rank1(col);
+            this->phi->phi_supp[old_top_hap].remove(col_rank);
             this->phi->phi_vec[old_top_hap].set(col, false);
 
-            // new sample beg
-            columns[col].pref_samples_beg.set(0, M);
+            // update new sample beg
+            columns[col].pref_samples_beg.set(i, M);
             this->phi->phi_vec[M].set(col, true);
-            this->phi->phi_supp[M].push_back(UINT_MAX);
+            temp_supp.push_back(UINT_MAX);
           }
         } else {
           if (allele) {
             columns[col].combined.increment(i, 1);
             columns[col].ones.increment(i, 1);
 
-            // update(unset) old sample beg
-            auto old_top_hap = columns[col].pref_samples_beg.at(0);
-            auto rank = this->phi->phi_vec[old_top_hap].rank1(col);
-            this->phi->phi_supp[old_top_hap].remove(rank);
+            // remove & unset old sample beg
+            auto old_top_hap = hap_id;
+            auto col_rank = this->phi->phi_vec[old_top_hap].rank1(col);
+            this->phi->phi_supp[old_top_hap].remove(col_rank);
             this->phi->phi_vec[old_top_hap].set(col, false);
 
-            // new sample beg
-            columns[col].pref_samples_beg.set(0, M);
+            // insert new sample beg
+            columns[col].pref_samples_beg.set(i, M);
             this->phi->phi_vec[M].set(col, true);
-            this->phi->phi_supp[M].push_back(UINT_MAX);
-
+            temp_supp.push_back(UINT_MAX);
           } else {
+            // insert new run
             columns[col].combined.insert(i, 1);
             columns[col].zeros.insert(i, 1);
             columns[col].start_with_zero = true;
             ++columns[col].num_zeros;
 
-            auto old_top_hap = columns[col].pref_samples_beg.at(i);
-            auto rank = this->phi->phi_vec[old_top_hap].rank1(col);
-            this->phi->phi_supp[old_top_hap].set(rank , M);
+            // update old top's related data-structures
+            auto old_top_hap = hap_id;
+            auto col_rank = this->phi->phi_vec[old_top_hap].rank1(col);
+            this->phi->phi_supp[old_top_hap].set(col_rank , M);
 
             columns[col].pref_samples_beg.insert(i, M);
             columns[col].pref_samples_end.insert(i, M);
@@ -357,9 +371,8 @@ class DCPBWT{
             // phi support
             this->phi->phi_vec[M].set(col, true);
             this->phi->phi_inv_vec[M].set(col, true);
-
-            this->phi->phi_supp[M].push_back(UINT_MAX);
-            this->phi->phi_inv_supp[M].push_back(old_top_hap);
+            temp_supp.push_back(UINT_MAX);
+            temp_inv_supp.push_back(old_top_hap);
           }
         }
         return;
@@ -383,18 +396,20 @@ class DCPBWT{
             ++columns[col].num_zeros;
           }
           // since allele is being added at the end of prev. run
-          //unset old hap
+          // unset old hap
           auto old_end_hap = columns[col].pref_samples_end.at(run_idx);
-          auto rank = this->phi->phi_inv_vec[old_end_hap].rank1(col);
-          auto prev_below = this->phi->phi_inv_supp[old_end_hap].at(rank);
-          this->phi->phi_inv_supp[old_end_hap].remove(rank);
+          auto col_rank = this->phi->phi_inv_vec[old_end_hap].rank1(col);
+          this->phi->phi_inv_supp[old_end_hap].remove(col_rank);
           this->phi->phi_inv_vec[old_end_hap].set(col, false);
+
+          // update the run_idx + 1's top as well
+          col_rank = this->phi->phi_vec[hap_id].rank1(col);
+          this->phi->phi_supp[hap_id].set(col_rank, M);
 
           // set the new one
           columns[col].pref_samples_end.set(run_idx, M);
           this->phi->phi_inv_vec[M].set(col, true);
-          this->phi->phi_inv_supp[M].push_back(prev_below);
-
+          temp_inv_supp.push_back(hap_id);
         } else {
           // change to new run head
           columns[col].combined.increment(run_idx, 1);
@@ -405,16 +420,21 @@ class DCPBWT{
             ++columns[col].num_zeros;
           }
           // update(unset) old sample beg
-          auto old_top_hap = columns[col].pref_samples_beg.at(run_idx);
-          auto rank = this->phi->phi_vec[old_top_hap].rank1(col);
-          auto old_above_val = this->phi->phi_supp[old_top_hap].at(rank);
-          this->phi->phi_supp[old_top_hap].remove(rank);
+          auto old_top_hap = hap_id;
+          auto col_rank = this->phi->phi_vec[old_top_hap].rank1(col);
+          this->phi->phi_supp[old_top_hap].remove(col_rank);
           this->phi->phi_vec[old_top_hap].set(col, false);
+
+          // update what will be below the previous run's end
+          assert(run_idx - 1 < UINT_MAX);
+          auto above_old_top_hap = columns[col].pref_samples_end.at(run_idx - 1);
+          auto rank = this->phi->phi_inv_vec[above_old_top_hap].rank1(col);
+          this->phi->phi_inv_supp[above_old_top_hap].set(rank, M);
 
           // set the new sample beg
           columns[col].pref_samples_beg.set(run_idx, M);
           this->phi->phi_vec[M].set(col, true);
-          this->phi->phi_supp[M].push_back(old_above_val);
+          temp_supp.push_back(above_old_top_hap);
         }
         return;
       }
@@ -441,7 +461,7 @@ class DCPBWT{
       unsigned int  new_idx = run_idx/2 + 1;
 
       // find hapID that is before and after inserted haplotype
-      unsigned int hap_before = this->phi->phi_inv(hap_id, col).value();
+      unsigned int hap_before = this->phi->phi(hap_id, col).value();
       unsigned int hap_after = hap_id;
 
       // Insert and set bit vecs for for hap_before
@@ -466,8 +486,10 @@ class DCPBWT{
       // Inserted Haplotype
       this->phi->phi_vec[M].set(col, true);
       this->phi->phi_inv_vec[M].set(col, true);
-      this->phi->phi_supp[M].push_back(hap_before);
-      this->phi->phi_inv_supp[M].push_back(hap_after);
+      // this->phi->phi_supp[M].push_back(hap_before);
+      // this->phi->phi_inv_supp[M].push_back(hap_after);
+      temp_supp.push_back(hap_before);
+      temp_inv_supp.push_back(hap_after);
 
       if (allele) {
         assert(new_idx <= columns[col].ones.size());
@@ -481,12 +503,14 @@ class DCPBWT{
 
     void InsertSinglelHaplotype(std::vector<bool>& query) {
       assert(query.size() == N);
-      vector<pair<unsigned int, unsigned int>> insertion_indices(N); // stores {index, hapid}
-      insertion_indices[0] = {M, M};
+      vector<pair<unsigned int, unsigned int>> insertion_indices; // stores {index, hapid}
+      insertion_indices.emplace_back(M, M);
 
       // calculate insertion indices
       for(unsigned int col = 1; col < query.size(); ++col) {
-        insertion_indices.emplace_back(w_mod(insertion_indices[col-1].first, col-1,  query[col-1], insertion_indices[col-1].second));
+        auto retval = w_mod(insertion_indices[col-1].first, col-1,  query[col-1], insertion_indices[col-1].second);
+        // cout << retval.first << " : " << retval.second << "\n";
+        insertion_indices.push_back(retval);
       }
 
       // initialize new phi structure
@@ -497,11 +521,20 @@ class DCPBWT{
       }
       this->phi->phi_vec.push_back(tmp_b);
       this->phi->phi_inv_vec.push_back(tmp_e);
+      packed_spsi temp_supp;
+      packed_spsi temp_inv_supp;
 
       // perform insertion
       for(unsigned int col = 0; col < query.size(); ++col) {
-        Insert(col, insertion_indices[col].first, insertion_indices[col].second, query[col]);
+        Insert(col, insertion_indices[col].first, insertion_indices[col].second, query[col], temp_supp, temp_inv_supp);
       }
+
+      // handling for col == N case
+      temp_supp.push_back(this->phi->phi(insertion_indices[N-1].second, N-1).value());
+      temp_inv_supp.push_back(insertion_indices[N-1].second);
+
+      this->phi->phi_supp.push_back(temp_supp);
+      this->phi->phi_inv_supp.push_back(temp_inv_supp);
       // increment total # of haplotypes
       ++M;
     }

@@ -101,7 +101,7 @@ public:
                 // support phi panel (if we are in the first run we use default
                 // value)
                 if (j == 0) {
-                    this->phi_supp[columns[col].pref_samples_beg[j]].push_back(total_haplotypes);
+                    this->phi_supp[columns[col].pref_samples_beg[j]].push_back(UINT_MAX);
                     // phi_supp_tmp_l[cols[i].sample_beg[j]].push_back(0);
                 } else {
                     this->phi_supp[columns[col].pref_samples_beg[j]].push_back(columns[col].pref_samples_end[j - 1]);
@@ -114,7 +114,7 @@ public:
                 // value)
                 if (j == columns[col].pref_samples_beg.size() - 1) {
                     this->phi_inv_supp[columns[col].pref_samples_end[j]].push_back(
-                            total_haplotypes);
+                            UINT_MAX);
                 } else {
                     this->phi_inv_supp[columns[col].pref_samples_end[j]].push_back(
                             columns[col].pref_samples_beg[j+1]);
@@ -128,7 +128,7 @@ public:
             if (j == 0) {
                 if ((this->phi_supp[last_pref[j]].size() == 0) ||
                     this->phi_supp[last_pref[j]][this->phi_supp[last_pref[j]].size() - 1] != this->total_haplotypes) {
-                        this->phi_supp[last_pref[j]].push_back(total_haplotypes);
+                        this->phi_supp[last_pref[j]].push_back(UINT_MAX);
                     // phi_supp_tmp_l[last_pref[j]].push_back(0);
                 }
             } else {
@@ -141,7 +141,7 @@ public:
             if (j == this->phi_supp.size() - 1) {
                 if (this->phi_inv_supp[last_pref[j]].size() == 0 ||
                     this->phi_inv_supp[last_pref[j]][this->phi_inv_supp[last_pref[j]].size() - 1] != total_haplotypes) {
-                    this->phi_inv_supp[last_pref[j]].push_back(total_haplotypes);
+                    this->phi_inv_supp[last_pref[j]].push_back(UINT_MAX);
                 }
             } else {
                 if (this->phi_inv_supp[last_pref[j]].size() == 0 ||

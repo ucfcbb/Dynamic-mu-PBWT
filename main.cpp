@@ -78,8 +78,8 @@ int main(int argc, char** argv){
     DCPBWT dcpbwt(ref_vcf_input, verbose);
     // Test_UV(dcpbwt);
 
-    // vector<bool> query{false, true, false, false, true, false, true, false, false, false, true, true, true, false, true};
-    // dcpbwt.InsertSinglelHaplotype(query);
+    vector<bool> query{false, true, false, false, true, false, true, false, false, false, true, true, true, false, true};
+    dcpbwt.InsertSinglelHaplotype(query);
     // Test_Insert();
     return (EXIT_SUCCESS);
 }
