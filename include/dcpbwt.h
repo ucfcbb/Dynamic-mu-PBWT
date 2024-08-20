@@ -10,6 +10,7 @@
 #include "dynamic/dynamic.hpp"
 #include "phi.h"
 #include "dcpbwt_column.h"
+#include <random>
 
 using namespace dyn;
 using namespace std;
@@ -117,6 +118,9 @@ class DCPBWT {
     // build the ref panel
     // Build(alleles);
     BuildFromVCF(ref_vcf_file, verbose);
+  }
+  ~DCPBWT() {
+    delete phi;
   }
 
   [[nodiscard]] unsigned int get_run_idx(const unsigned int col, const unsigned int i) const {
@@ -614,7 +618,7 @@ class DCPBWT {
       // new top will be the head of next run
       unsigned int new_top = UINT_MAX;
       if (idx + 1 < this->columns[col].pref_samples_beg.size())
-        new_top = this->columns[col].pref_samples_beg[idx + 1];
+        new_top = this->columns[col].pref_samples_beg.at(idx + 1);
 
       // update pref_beg/end
       this->columns[col].pref_samples_beg.remove(run_idx);
@@ -850,6 +854,7 @@ class DCPBWT {
       return;
     }
 
+
     unsigned int idx = 0;
     auto ret = find(haplotype_ids.begin(), haplotype_ids.end(), hap_id);
     idx = distance(haplotype_ids.begin(), ret);
@@ -881,6 +886,13 @@ class DCPBWT {
 
     assert(alleles.size() == haplotype_info.size());
     assert(alleles.size() == this->N);
+    if (this->M == 1){
+      cout << "Only single haplotype remaining to delete!\n";
+      for(unsigned int col = 0; col < this->N; ++col){
+        this->columns[col].pref_samples_beg.set(0, 0);
+        this->columns[col].pref_samples_end.set(0, 0);
+      }
+    }
     // delete from each column
     for (unsigned int col = 0; col < this->N; ++col) {
       Delete(col, haplotype_info[col].first, haplotype_info[col].second, alleles[col]);
@@ -970,8 +982,10 @@ class DCPBWT {
         packed_spsi temp_zeros;
         packed_spsi temp_ones;
         packed_spsi temp_combined;
-        packed_spsi temp_sample_beg;
-        packed_spsi temp_sample_end;
+//        packed_spsi temp_sample_beg;
+//        packed_spsi temp_sample_end;
+        succinct_spsi temp_sample_beg;
+        succinct_spsi temp_sample_end;
         bool start_with_zero = false;
 
         assert(single_col.size() == this->M);
@@ -1093,8 +1107,10 @@ class DCPBWT {
       packed_spsi temp_zeros;
       packed_spsi temp_ones;
       packed_spsi temp_combined;
-      packed_spsi temp_sample_beg;
-      packed_spsi temp_sample_end;
+//      packed_spsi temp_sample_beg;
+//      packed_spsi temp_sample_end;
+      succinct_spsi temp_sample_beg;
+      succinct_spsi temp_sample_end;
       bool start_with_zero = false;
 
       for (int i = 0; i < M; ++i) {
