@@ -10,91 +10,15 @@
 #include "dynamic/dynamic.hpp"
 #include "phi.h"
 #include "dcpbwt_column.h"
-#include <random>
+
+#include "utils.h"
 
 using namespace dyn;
 using namespace std;
 
 //typedef spsi<packed_vector, 256, 2> my_spsi;
 
-inline pair<unsigned int, unsigned int> ReadVCF(string &filename) {
-  unsigned int M = 0;
-  unsigned int N = 0;
-  std::string line = "##";
-  std::ifstream inFile(filename);
-  if (inFile.is_open()) {
-    while (line[1] == '#') {
-      getline(inFile, line);
-    }
 
-    // read individual ids
-    std::istringstream iss(line);
-    std::string token;
-    for (int i = 0; i < 9; ++i) {
-      iss >> token;
-    }
-    while (iss >> token) {
-      M += 2;
-      // individual_ids.push_back(token);
-    }
-
-    // go through all sites
-    while (getline(inFile, line)) {
-      ++N;
-    }
-    inFile.close();
-  } else {
-    std::cerr << "Couldn't find : " << filename << "\n";
-    exit(1);
-  }
-  std::cout << "M (# of haplotypes) = " << M << " : N (# of sites) = " << N << "\n";
-  return {M, N};
-}
-
-inline void ReadVCF(string &filename, vector<vector<bool>> &alleles) {
-  int M = 0;
-  int N = 0;
-  std::string line = "##";
-  std::ifstream inFile(filename);
-  if (inFile.is_open()) {
-    while (line[1] == '#') {
-      getline(inFile, line);
-    }
-
-    // read individual ids
-    std::istringstream iss(line);
-    std::string token;
-    for (int i = 0; i < 9; ++i) {
-      iss >> token;
-    }
-    while (iss >> token) {
-      M += 2;
-      // individual_ids.push_back(token);
-    }
-
-    // go through all sites
-    while (getline(inFile, line)) {
-      ++N;
-      std::istringstream iss(line);
-      token = "";
-      std::vector<bool> single_col;
-      for (int i = 0; i < (M / 2) + 9; ++i) {
-        iss >> token;
-        if (i < 9) {
-          continue;
-        }
-        single_col.push_back(static_cast<bool>(token[0] - '0'));
-        single_col.push_back(static_cast<bool>(token[2] - '0'));
-      }
-      alleles.push_back(single_col);
-    }
-    inFile.close();
-  } else {
-    std::cerr << "Couldn't find : " << filename << "\n";
-    exit(1);
-  }
-  std::cout << "M (# of haplotypes) = " << M << " : N (# of sites) = " << N << "\n";
-}
 
 class DCPBWT {
  public:
@@ -854,7 +778,10 @@ class DCPBWT {
       return;
     }
 
-
+    // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
+    // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
+    //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
+    // Get appropriate haplotype_index
     unsigned int idx = 0;
     auto ret = find(haplotype_ids.begin(), haplotype_ids.end(), hap_id);
     idx = distance(haplotype_ids.begin(), ret);
@@ -866,9 +793,6 @@ class DCPBWT {
     // find where the haplotype is mapped to in each column
     for (unsigned int col = 0; col < this->N; ++col) {
       if (col == 0) {
-        // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
-        // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
-        //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
         haplotype_info.emplace_back(idx, hap_id);
         continue;
       }
@@ -910,21 +834,19 @@ class DCPBWT {
       assert(static_cast<bool>(this->phi->phi_vec[haplotype_info[0].second].at(i)) == false);
       assert(static_cast<bool>(this->phi->phi_inv_vec[haplotype_info[0].second].at(i)) == false);
     }
-
-//    std::cout << this->phi->phi_supp[haplotype_info[0].second].size() << "\n";
-//    std::cout << this->phi->phi_supp[haplotype_info[0].second].at(0) << "\n";
     assert(this->phi->phi_supp[haplotype_info[0].second].size() == 1);
     assert(this->phi->phi_inv_supp[haplotype_info[0].second].size() == 1);
 
+    // Fix for last column update
     auto last_above = this->phi->phi_supp[haplotype_info[0].second].at(0);
     auto last_below = this->phi->phi_inv_supp[haplotype_info[0].second].at(0);
-
     if (last_above != UINT_MAX) {
       this->phi->phi_inv_supp[last_above].set(this->phi->phi_inv_supp[last_above].size() - 1, last_below);
     }
     if (last_below != UINT_MAX) {
       this->phi->phi_supp[last_below].set(this->phi->phi_supp[last_below].size() - 1, last_above);
     }
+
     haplotype_ids.erase(haplotype_info[0].second);
     --this->M;
     --this->phi->total_haplotypes;
