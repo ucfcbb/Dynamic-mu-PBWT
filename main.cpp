@@ -78,8 +78,10 @@ void Test_Insertion(string& ref_vcf_input, string& query_vcf_input, bool verbose
 
   cout << "Testing Insertion...\n";
   vector<vector<bool>> alleles;
+  clock_t START_query_read = clock();
   ReadQueryVCF(query_vcf_input, alleles);
-  cout << "#sites = " << alleles[0].size() << "\n";
+  auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
+  cout << "Time to read query alleles: " << time_read_query << " s\n";
 
   // go through all query haplotypes
   clock_t START_INSERT = clock();
@@ -88,7 +90,7 @@ void Test_Insertion(string& ref_vcf_input, string& query_vcf_input, bool verbose
   }
   auto time_insert = (float) (clock() - START_INSERT) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
-  cout << "Insertion took " << time_insert << " s.\n";
+  cout << "Insertion took: " << time_insert << " s.\n";
 }
 
 int main(int argc, char **argv) {
