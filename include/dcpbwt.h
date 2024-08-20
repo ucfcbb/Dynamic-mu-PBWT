@@ -99,6 +99,7 @@ class DCPBWT {
  public:
   unsigned int M; // #haplotypes
   unsigned int N; // #sites
+  set<unsigned int> haplotype_ids;
   std::vector<dcpbwt_column> columns;
   phi_ds *phi = nullptr;
 
@@ -109,6 +110,9 @@ class DCPBWT {
     auto retval = ReadVCF(ref_vcf_file);
     this->M = retval.first;
     this->N = retval.second;
+    for (unsigned int i = 0; i < M; ++i) {
+      haplotype_ids.insert(i);
+    }
 
     // build the ref panel
     // Build(alleles);
@@ -116,7 +120,7 @@ class DCPBWT {
   }
 
   [[nodiscard]] unsigned int get_run_idx(const unsigned int col, const unsigned int i) const {
-    if (i == (this->M - 1)) {
+    if (i >= (this->M - 1)) {
       return columns[col].combined.size() - 1;
     }
     return columns[col].combined.search(i + 1);
@@ -251,13 +255,23 @@ class DCPBWT {
     bool match = false;
     if (this->columns[col].start_with_zero) {
       // even run & allele has to be zero
-      if (!(run_idx & 1) && (!allele)) {
-        match = true;
+      if (run_idx & 1) { // odd run
+        if (allele)
+          match = true;
+      } else {
+        if (!allele)
+          match = true;
       }
     } else {
       // even run & allele has to be one
-      if (!(run_idx & 1) && allele)
-        match = true;
+      if (run_idx & 1) { // odd run
+        if (!allele) {
+          match = true;
+        }
+      } else { // even run
+        if (allele)
+          match = true;
+      }
     }
     return match;
   }
@@ -339,10 +353,10 @@ class DCPBWT {
          */
         // update run info
         this->columns[col].combined.increment(run_idx - 1, 1);
-        if (allele){
-          this->columns[col].ones.insert((run_idx - 1)/2, 1);
+        if (allele) {
+          this->columns[col].ones.increment((run_idx - 1) / 2, 1);
         } else {
-          this->columns[col].zeros.insert((run_idx - 1)/2, 1);
+          this->columns[col].zeros.increment((run_idx - 1) / 2, 1);
           ++this->columns[col].num_zeros;
         }
 
@@ -360,9 +374,68 @@ class DCPBWT {
 
         // update phi_inv value for hap_id
         assert(hap_id != UINT_MAX);
-        col_rank = this->phi->phi_vec[hap_id].rank1(col);
-        this->phi->phi_supp[hap_id].set(col_rank, this->M);
+        if (hap_id != UINT_MAX) {
+          col_rank = this->phi->phi_vec[hap_id].rank1(col);
+          this->phi->phi_supp[hap_id].set(col_rank, this->M);
+        }
       }
+    }
+  }
+
+  void InsertAtBottom(const unsigned int col,
+                      const unsigned int run_idx,
+                      const unsigned int hap_id,
+                      const bool allele,
+                      packed_spsi &temp_supp,
+                      packed_spsi &temp_inv_supp) {
+    if (AlleleMatchesRun(col, run_idx, allele)) {
+      // Update Run info
+      columns[col].combined.increment(run_idx, 1);
+      if (allele) {
+        columns[col].ones.increment(run_idx / 2, 1);
+      } else {
+        columns[col].zeros.increment(run_idx / 2, 1);
+        ++columns[col].num_zeros;
+      }
+
+      // Update pref end
+      unsigned int old_bottom = this->columns[col].pref_samples_end.at(run_idx);
+      this->columns[col].pref_samples_end.set(run_idx, this->M);
+
+      // Update old bottom's Phi structures
+      auto col_rank = this->phi->phi_inv_vec[old_bottom].rank1(col);
+      this->phi->phi_inv_supp[old_bottom].remove(col_rank);
+      this->phi->phi_inv_vec[old_bottom].set(col, false);
+
+      // Update new bottom's Phi structures
+      this->phi->phi_inv_vec[this->M].set(col, true);
+      temp_inv_supp.push_back(UINT_MAX);
+    } else {
+      // Update run info
+      this->columns[col].combined.push_back(1);
+      if (allele) {
+        this->columns[col].ones.push_back(1);
+      } else {
+        this->columns[col].zeros.push_back(1);
+        ++this->columns[col].num_zeros;
+      }
+
+      assert(run_idx == this->columns[col].pref_samples_end.size() - 1);
+      unsigned int hap_before = this->columns[col].pref_samples_end.at(run_idx);
+
+      // update pref beg/end
+      this->columns[col].pref_samples_beg.push_back(this->M);
+      this->columns[col].pref_samples_end.push_back(this->M);
+
+      // Update phi supports for inserted haplotype
+      this->phi->phi_vec[this->M].set(col, true);
+      this->phi->phi_inv_vec[this->M].set(col, true);
+      temp_supp.push_back(hap_before);
+      temp_inv_supp.push_back(UINT_MAX);
+
+      // Update for hap_before
+      auto col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
+      this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
     }
   }
 
@@ -374,8 +447,13 @@ class DCPBWT {
               packed_spsi &temp_inv_supp) {
     // assumes Non-empty ref panel (i.e. a panel is built prior to insertion)
     auto run_idx = get_run_idx(col, idx);
-    if (isRunStart(col, run_idx, allele)) {
+    if (isRunStart(col, run_idx, hap_id)) {
       InsertAtRunStart(col, idx, hap_id, allele, temp_supp, temp_inv_supp);
+      return;
+    }
+
+    if (idx == this->M) {
+      InsertAtBottom(col, run_idx, hap_id, allele, temp_supp, temp_inv_supp);
       return;
     }
 
@@ -392,34 +470,9 @@ class DCPBWT {
       /*
        * Create a new run as the existing run will be split
        */
-      if (idx == this->M){
-        // Update run info
-        this->columns[col].combined.push_back(1);
-        if (allele){
-          this->columns[col].ones.push_back(1);
-        } else {
-          this->columns[col].zeros.push_back(1);
-          ++this->columns[col].num_zeros;
-        }
-        assert(run_idx == this->columns[col].pref_samples_end.size());
-        unsigned int hap_before = this->columns[col].pref_samples_end.at(run_idx);
-
-        // update pref beg/end
-        this->columns[col].pref_samples_beg.push_back(this->M);
-        this->columns[col].pref_samples_end.push_back(this->M);
-
-        // Update phi supports for inserted haplotype
-        this->phi->phi_vec[this->M].set(col, true);
-        this->phi->phi_inv_vec[this->M].set(col, true);
-        temp_supp.push_back(hap_before);
-        temp_inv_supp.push_back(UINT_MAX);
-
-        // Update for hap_before
-        auto col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
-        this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
-        return;
-      }
-      unsigned int hap_before = this->phi->phi(hap_id, col).value();
+      auto hap_before_opt = this->phi->phi(hap_id, col);
+      assert(hap_before_opt.has_value());
+      unsigned int hap_before = hap_before_opt.value();
       unsigned int hap_after = hap_id;
 
       // Update run info
@@ -432,7 +485,12 @@ class DCPBWT {
 
       if (allele) {
         // Inserting 1 in a run of 0s
-        this->columns[col].zeros.insert((run_idx - 1) / 2 + 1, 1);
+        if (run_idx == 0) {
+          this->columns[col].ones.insert(run_idx, 1);
+        } else {
+          assert(run_idx > 0);
+          this->columns[col].ones.insert((run_idx - 1) / 2 + 1, 1);
+        }
 
         // Update Zeros vector
         this->columns[col].zeros.set(run_idx / 2, left_rem);
@@ -512,13 +570,27 @@ class DCPBWT {
     }
 
     // handling for col == N case
-    temp_supp.push_back(this->phi->phi(insertion_indices[N - 1].second, N - 1).value());
-    temp_inv_supp.push_back(insertion_indices[N - 1].second);
-
+    auto hap_above_opt = this->phi->phi(insertion_indices[N - 1].second, N - 1);
+    assert(hap_above_opt.has_value());
+    auto hap_above = hap_above_opt.value();
+    auto hap_below = insertion_indices[N - 1].second;
+    temp_supp.push_back(hap_above);
+    temp_inv_supp.push_back(hap_below);
     this->phi->phi_supp.push_back(temp_supp);
     this->phi->phi_inv_supp.push_back(temp_inv_supp);
+
+    // Update for hap_below and hap_above too
+    if (hap_above != UINT_MAX) {
+      this->phi->phi_inv_supp[hap_above].set(this->phi->phi_inv_supp[hap_above].size() - 1, this->M);
+    }
+    if (hap_below != UINT_MAX) {
+      this->phi->phi_supp[hap_below].set(this->phi->phi_supp[hap_below].size() - 1, this->M);
+    }
+
     // increment total # of haplotypes
-    ++M;
+    this->haplotype_ids.insert(this->M);
+    ++this->M;
+    ++this->phi->total_haplotypes;
   }
 
   bool isRunWithSingleElement(const unsigned int col, const unsigned int run_idx) {
@@ -540,11 +612,13 @@ class DCPBWT {
     // if at the top of a column
     if (idx == 0) {
       // new top will be the head of next run
-      unsigned int new_top = this->columns[col].pref_samples_beg[idx + 1];
+      unsigned int new_top = UINT_MAX;
+      if (idx + 1 < this->columns[col].pref_samples_beg.size())
+        new_top = this->columns[col].pref_samples_beg[idx + 1];
 
       // update pref_beg/end
-      this->columns[col].pref_samples_beg.remove(idx);
-      this->columns[col].pref_samples_end.remove(idx);
+      this->columns[col].pref_samples_beg.remove(run_idx);
+      this->columns[col].pref_samples_end.remove(run_idx);
 
       // update run info spsis
       this->columns[col].combined.remove(idx);
@@ -559,21 +633,25 @@ class DCPBWT {
 
       // update phi structures for removed haplotype
       auto col_rank = this->phi->phi_vec[hap_id].rank1(col);
-      this->phi->phi_supp[hap_id].remove(col_rank);
+      if (this->phi->phi_supp[hap_id].size() > 1)
+        this->phi->phi_supp[hap_id].remove(col_rank);
       col_rank = this->phi->phi_inv_vec[hap_id].rank1(col);
-      this->phi->phi_inv_supp[hap_id].remove(col_rank);
+      if (this->phi->phi_inv_supp[hap_id].size() > 1)
+        this->phi->phi_inv_supp[hap_id].remove(col_rank);
       this->phi->phi_vec[hap_id].set(col, false);
       this->phi->phi_inv_vec[hap_id].set(col, false);
 
       // update phi for the new top
-      col_rank = this->phi->phi_vec[new_top].rank1(col);
-      this->phi->phi_supp[new_top].set(col_rank, UINT_MAX);
+      if (new_top != UINT_MAX) {
+        col_rank = this->phi->phi_vec[new_top].rank1(col);
+        this->phi->phi_supp[new_top].set(col_rank, UINT_MAX);
+      }
 
     } else if (idx == this->M - 1) { // at the bottom of a column
       run_idx = this->columns[col].pref_samples_beg.size() - 1;
 
       // new bottom will be the head of next run
-      unsigned int new_bottom = this->columns[col].pref_samples_beg[run_idx - 1];
+      unsigned int new_bottom = this->columns[col].pref_samples_end[run_idx - 1];
 
       // update pref_beg/end
       this->columns[col].pref_samples_beg.remove(run_idx);
@@ -582,19 +660,21 @@ class DCPBWT {
       // update run info spsis
       this->columns[col].combined.remove(run_idx);
       if (allele) {
-        assert(this->columns[col].ones.at(run_idx) == 1);
-        this->columns[col].ones.remove(run_idx);
+        assert(this->columns[col].ones.at(run_idx / 2) == 1);
+        this->columns[col].ones.remove(run_idx / 2);
       } else {
-        assert(this->columns[col].zeros.at(run_idx) == 1);
-        this->columns[col].zeros.remove(run_idx);
+        assert(this->columns[col].zeros.at(run_idx / 2) == 1);
+        this->columns[col].zeros.remove(run_idx / 2);
         --this->columns[col].num_zeros;
       }
 
       // update phi structures for removed haplotype
       auto col_rank = this->phi->phi_vec[hap_id].rank1(col);
-      this->phi->phi_supp[hap_id].remove(col_rank);
+      if (this->phi->phi_supp[hap_id].size() > 1)
+        this->phi->phi_supp[hap_id].remove(col_rank);
       col_rank = this->phi->phi_inv_vec[hap_id].rank1(col);
-      this->phi->phi_inv_supp[hap_id].remove(col_rank);
+      if (this->phi->phi_inv_supp[hap_id].size() > 1)
+        this->phi->phi_inv_supp[hap_id].remove(col_rank);
       this->phi->phi_vec[hap_id].set(col, false);
       this->phi->phi_inv_vec[hap_id].set(col, false);
 
@@ -655,14 +735,19 @@ class DCPBWT {
     }
   }
 
-  void DeleteAtRunStart(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id, const bool allele) {
+  void DeleteAtRunStart(const unsigned int col,
+                        const unsigned int run_idx,
+                        const unsigned int hap_id,
+                        const bool allele) {
     unsigned int hap_before = 0;
     if (run_idx == 0) {
       hap_before = UINT_MAX;
     } else {
       hap_before = this->columns[col].pref_samples_end.at(run_idx - 1);
     }
-    unsigned int hap_after = this->phi->phi(hap_id, col).value();
+    auto hap_after_opt = this->phi->phi_inv(hap_id, col);
+    assert(hap_after_opt.has_value());
+    unsigned int hap_after = hap_after_opt.value();
 
     // update run info spsi
     this->columns[col].combined.decrement(run_idx, 1);
@@ -684,7 +769,7 @@ class DCPBWT {
     // update phi for new head of run
     col_rank = this->phi->phi_vec[hap_after].rank1(col);
     this->phi->phi_supp[hap_after].insert(col_rank, hap_before);
-    this->phi->phi_vec[hap_after].set(col, false);
+    this->phi->phi_vec[hap_after].set(col, true);
 
     // update phi for hap_before
     if (hap_before != UINT_MAX) {
@@ -694,8 +779,13 @@ class DCPBWT {
 
   }
 
-  void DeleteAtRunEnd(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id, const bool allele) {
-    auto new_bottom = this->phi->phi(hap_id, col).value();
+  void DeleteAtRunEnd(const unsigned int col,
+                      const unsigned int run_idx,
+                      const unsigned int hap_id,
+                      const bool allele) {
+    auto new_bottom_opt = this->phi->phi(hap_id, col);
+    assert(new_bottom_opt.has_value());
+    auto new_bottom = new_bottom_opt.value();
     unsigned int below_hap_id = UINT_MAX;
     if (run_idx + 1 < this->columns[col].pref_samples_beg.size()) {
       below_hap_id = this->columns[col].pref_samples_beg.at(run_idx + 1);
@@ -740,12 +830,13 @@ class DCPBWT {
       DeleteAtRunEnd(col, run_idx, hap_id, allele);
     } else {
       this->columns[col].combined.decrement(run_idx, 1);
-      if (allele){
-        this->columns[col].ones.decrement(run_idx/2, 1);
+      if (allele) {
+        this->columns[col].ones.decrement(run_idx / 2, 1);
       } else {
-        this->columns[col].zeros.decrement(run_idx/2, 1);
+        this->columns[col].zeros.decrement(run_idx / 2, 1);
         --this->columns[col].num_zeros;
       }
+
     }
   }
 
@@ -753,329 +844,345 @@ class DCPBWT {
    * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)
    * Result: Deletes that haplotype's allele from all columns
    */
-        void DeleteSingleHaplotype(const unsigned int idx) {
-          if (this->M == 0) {
-            cerr << "Panel is empty. Nothing to delete! \n";
-            return;
-          }
+  void DeleteSingleHaplotype(const unsigned int hap_id) {
+    if (this->M == 0) {
+      cerr << "Panel is empty. Nothing to delete! \n";
+      return;
+    }
 
-          assert (idx < this->M && idx >= 0);
-          vector<pair<unsigned int, unsigned int>> haplotype_info; // {index, hapid, allele}
-          vector<bool> alleles;
+    unsigned int idx = 0;
+    auto ret = find(haplotype_ids.begin(), haplotype_ids.end(), hap_id);
+    idx = distance(haplotype_ids.begin(), ret);
 
-          // find where the haplotype is mapped to in each column
-          for (unsigned int col = 0; col < this->N; ++col) {
-            if (col == 0) {
-              // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
-              // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
-              //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
-              haplotype_info.emplace_back(idx, idx);
-              continue;
-            }
-            unsigned int run_idx = get_run_idx(col - 1, haplotype_info[col - 1].first);
-            const bool allele = this->get_run_val(col - 1, run_idx);
-            auto retval = w_mod(haplotype_info[col - 1].first, col - 1, allele, haplotype_info[col - 1].second);
-            haplotype_info.emplace_back(retval);
-            alleles.push_back(allele);
-          }
+    assert (idx < this->M && idx >= 0);
+    vector<pair<unsigned int, unsigned int>> haplotype_info; // {index, hapid, allele}
+    vector<bool> alleles;
 
-          // get last allele
-          auto run_idx = get_run_idx(this->N - 1, haplotype_info[this->N - 1].first);
-          bool allele = this->get_run_val(this->N - 1, run_idx);
-          alleles.push_back(allele);
+    // find where the haplotype is mapped to in each column
+    for (unsigned int col = 0; col < this->N; ++col) {
+      if (col == 0) {
+        // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
+        // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
+        //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
+        haplotype_info.emplace_back(idx, hap_id);
+        continue;
+      }
+      unsigned int run_idx = get_run_idx(col - 1, haplotype_info[col - 1].first);
+      const bool allele = this->get_run_val(col - 1, run_idx);
+      auto retval = w_mod(haplotype_info[col - 1].first, col - 1, allele, haplotype_info[col - 1].second);
+      haplotype_info.emplace_back(retval);
+      alleles.push_back(allele);
+    }
 
-          assert(alleles.size() == haplotype_info.size());
-          assert(alleles.size() == this->N);
-          // delete from each column
-          for (unsigned int col = 0; col < this->N; ++col) {
-            Delete(col, haplotype_info[col].first, haplotype_info[col].second, alleles[col]);
-          }
+    // get last allele
+    auto run_idx = get_run_idx(this->N - 1, haplotype_info[this->N - 1].first);
+    bool allele = this->get_run_val(this->N - 1, run_idx);
+    alleles.push_back(allele);
 
-          // delete from the phi supports
-          // assuming phi vectors are implemented as hash maps
+    assert(alleles.size() == haplotype_info.size());
+    assert(alleles.size() == this->N);
+    // delete from each column
+    for (unsigned int col = 0; col < this->N; ++col) {
+      Delete(col, haplotype_info[col].first, haplotype_info[col].second, alleles[col]);
+    }
+
+    // delete from the phi supports
+    // assuming phi vectors are implemented as hash maps
 //    this->phi->phi_vec.erase(haplotype_info[0].second);
 //    this->phi->phi_inv_vec.erase(haplotype_info[0].second);
 //    this->phi->phi_supp.erase(haplotype_info[0].second);
 //    this->phi->phi_inv_supp.erase(haplotype_info[0].second);
 
-          // checks
-          for (auto i = 0; i < this->N; ++i) {
-            assert(static_cast<bool>(this->phi->phi_vec[haplotype_info[0].second].at(i)) == false);
-            assert(static_cast<bool>(this->phi->phi_inv_vec[haplotype_info[0].second].at(i)) == false);
-          }
+    // checks
+    for (auto i = 0; i < this->N; ++i) {
+      assert(static_cast<bool>(this->phi->phi_vec[haplotype_info[0].second].at(i)) == false);
+      assert(static_cast<bool>(this->phi->phi_inv_vec[haplotype_info[0].second].at(i)) == false);
+    }
 
 //    std::cout << this->phi->phi_supp[haplotype_info[0].second].size() << "\n";
 //    std::cout << this->phi->phi_supp[haplotype_info[0].second].at(0) << "\n";
-          assert(this->phi->phi_supp[haplotype_info[0].second].size() == 1);
-          assert(this->phi->phi_inv_supp[haplotype_info[0].second].size() == 1);
-          --this->M;
+    assert(this->phi->phi_supp[haplotype_info[0].second].size() == 1);
+    assert(this->phi->phi_inv_supp[haplotype_info[0].second].size() == 1);
+
+    auto last_above = this->phi->phi_supp[haplotype_info[0].second].at(0);
+    auto last_below = this->phi->phi_inv_supp[haplotype_info[0].second].at(0);
+
+    if (last_above != UINT_MAX) {
+      this->phi->phi_inv_supp[last_above].set(this->phi->phi_inv_supp[last_above].size() - 1, last_below);
+    }
+    if (last_below != UINT_MAX) {
+      this->phi->phi_supp[last_below].set(this->phi->phi_supp[last_below].size() - 1, last_above);
+    }
+    haplotype_ids.erase(haplotype_info[0].second);
+    --this->M;
+    --this->phi->total_haplotypes;
+  }
+
+  // Build the reference panel
+  void BuildFromVCF(std::string &filename, bool verbose) {
+    std::string line = "##";
+    if (std::ifstream inFile(filename); inFile.is_open()) {
+      // go through headers
+      while (line[1] == '#') {
+        getline(inFile, line);
+      }
+
+      // read individual ids
+      std::istringstream iss(line);
+      std::string token;
+      for (int i = 0; i < 9; ++i) {
+        iss >> token;
+      }
+      while (iss >> token) {
+        // M += 2;
+        // individual_ids.push_back(token);
+      }
+
+      // go through all sites
+      vector<int> u, v;
+      vector<int> freq;
+      unsigned int total_runs = 0;
+      int col = 0;
+      int cnt = 1;
+      bool prev_allele = false;
+      // TODO: Possible optimization using sdsl int vec
+      vector<int> prefix_arr(M, 0);
+      std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
+      // TODO: Possible optimization using sdsl int vec
+      vector<vector<unsigned int>> sites_where_sample_beg(M);
+      vector<vector<unsigned int>> sites_where_sample_end(M);
+
+      while (getline(inFile, line)) {
+        std::istringstream iss(line);
+        token = "";
+
+        // read through the line and store in single_col
+        std::vector<bool> single_col;
+        for (int i = 0; i < (this->M / 2) + 9; ++i) {
+          iss >> token;
+          if (i < 9) {
+            continue;
+          }
+          single_col.push_back(static_cast<bool>(token[0] - '0'));
+          single_col.push_back(static_cast<bool>(token[2] - '0'));
         }
 
-        // Build the reference panel
-        void BuildFromVCF(std::string &filename, bool verbose) {
-          std::string line = "##";
-          if (std::ifstream inFile(filename); inFile.is_open()) {
-            // go through headers
-            while (line[1] == '#') {
-              getline(inFile, line);
+        packed_spsi temp_zeros;
+        packed_spsi temp_ones;
+        packed_spsi temp_combined;
+        packed_spsi temp_sample_beg;
+        packed_spsi temp_sample_end;
+        bool start_with_zero = false;
+
+        assert(single_col.size() == this->M);
+        for (int i = 0; i < this->M; ++i) {
+          // first allele
+          if (i == 0) {
+            if (single_col[prefix_arr[i]]) { // allele: 1
+              v.push_back(prefix_arr[i]);
+            } else { // allele: 0
+              u.push_back(prefix_arr[i]);
+              start_with_zero = true;
             }
-
-            // read individual ids
-            std::istringstream iss(line);
-            std::string token;
-            for (int i = 0; i < 9; ++i) {
-              iss >> token;
-            }
-            while (iss >> token) {
-              // M += 2;
-              // individual_ids.push_back(token);
-            }
-
-            // go through all sites
-            vector<int> u, v;
-            vector<int> freq;
-            unsigned int total_runs = 0;
-            int col = 0;
-            int cnt = 1;
-            bool prev_allele = false;
-            // TODO: Possible optimization using sdsl int vec
-            vector<int> prefix_arr(M, 0);
-            std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
-            // TODO: Possible optimization using sdsl int vec
-            vector<vector<unsigned int>> sites_where_sample_beg(M);
-            vector<vector<unsigned int>> sites_where_sample_end(M);
-
-            while (getline(inFile, line)) {
-              std::istringstream iss(line);
-              token = "";
-
-              // read through the line and store in single_col
-              std::vector<bool> single_col;
-              for (int i = 0; i < (this->M / 2) + 9; ++i) {
-                iss >> token;
-                if (i < 9) {
-                  continue;
-                }
-                single_col.push_back(static_cast<bool>(token[0] - '0'));
-                single_col.push_back(static_cast<bool>(token[2] - '0'));
-              }
-
-              packed_spsi temp_zeros;
-              packed_spsi temp_ones;
-              packed_spsi temp_combined;
-              packed_spsi temp_sample_beg;
-              packed_spsi temp_sample_end;
-              bool start_with_zero = false;
-
-              assert(single_col.size() == this->M);
-              for (int i = 0; i < this->M; ++i) {
-                // first allele
-                if (i == 0) {
-                  if (single_col[prefix_arr[i]]) { // allele: 1
-                    v.push_back(prefix_arr[i]);
-                  } else { // allele: 0
-                    u.push_back(prefix_arr[i]);
-                    start_with_zero = true;
-                  }
-                  temp_sample_beg.push_back(prefix_arr[i]);
-                  prev_allele = single_col[prefix_arr[i]];
-                  cnt = 1;
-                  continue;
-                }
-
-                // at run-change
-                if (single_col[prefix_arr[i]] != prev_allele) {
-                  freq.push_back(cnt);
-                  prev_allele = single_col[prefix_arr[i]];
-                  cnt = 1;
-                  temp_sample_beg.push_back(prefix_arr[i]);
-                  temp_sample_end.push_back(prefix_arr[i - 1]);
-                } else {
-                  ++cnt;
-                }
-
-                if (single_col[prefix_arr[i]]) { // allele 1
-                  v.push_back(prefix_arr[i]);
-                } else { // allele 0
-                  u.push_back(prefix_arr[i]);
-                }
-              }
-              temp_sample_end.push_back(prefix_arr[M - 1]);
-
-              // edge case
-              if (cnt > 0)
-                freq.push_back(cnt);
-
-              // populate dynamic data structures
-              for (int i = 0; i < freq.size(); ++i) {
-                temp_combined.push_back(freq[i]);
-                if (start_with_zero) {
-                  if (i % 2 == 0) {
-                    temp_zeros.push_back(freq[i]);
-                  } else {
-                    temp_ones.push_back(freq[i]);
-                  }
-                } else {
-                  if (i % 2 == 0) {
-                    temp_ones.push_back(freq[i]);
-                  } else {
-                    temp_zeros.push_back(freq[i]);
-                  }
-                }
-              }
-
-              assert(temp_combined.size() == temp_sample_beg.size());
-              assert(temp_combined.size() == temp_sample_end.size());
-
-              for (auto i = 0; i < temp_sample_beg.size(); ++i) {
-                sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
-                sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
-              }
-
-              // build each column
-              dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
-                                 (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
-                                 start_with_zero, u.size());
-              columns.emplace_back(coln);
-
-              total_runs += freq.size();
-
-              // next col prefix arr
-              prefix_arr.clear();
-              prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
-              prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
-              ++col;
-              u.clear();
-              v.clear();
-              freq.clear();
-            }
-            assert(columns.size() == N);
-            // build phi data-structure
-            this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, verbose);
-            assert(col == N);
-            total_runs += freq.size();
-            cout << "Phi support size (in bytes) = " << this->phi->size_in_bytes(verbose) << "\n";
-            cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
-
-            inFile.close();
-          } else {
-            std::cerr << "Couldn't find : " << filename << "\n";
-            exit(1);
+            temp_sample_beg.push_back(prefix_arr[i]);
+            prev_allele = single_col[prefix_arr[i]];
+            cnt = 1;
+            continue;
           }
 
+          // at run-change
+          if (single_col[prefix_arr[i]] != prev_allele) {
+            freq.push_back(cnt);
+            prev_allele = single_col[prefix_arr[i]];
+            cnt = 1;
+            temp_sample_beg.push_back(prefix_arr[i]);
+            temp_sample_end.push_back(prefix_arr[i - 1]);
+          } else {
+            ++cnt;
+          }
+
+          if (single_col[prefix_arr[i]]) { // allele 1
+            v.push_back(prefix_arr[i]);
+          } else { // allele 0
+            u.push_back(prefix_arr[i]);
+          }
+        }
+        temp_sample_end.push_back(prefix_arr[M - 1]);
+
+        // edge case
+        if (cnt > 0)
+          freq.push_back(cnt);
+
+        // populate dynamic data structures
+        for (int i = 0; i < freq.size(); ++i) {
+          temp_combined.push_back(freq[i]);
+          if (start_with_zero) {
+            if (i % 2 == 0) {
+              temp_zeros.push_back(freq[i]);
+            } else {
+              temp_ones.push_back(freq[i]);
+            }
+          } else {
+            if (i % 2 == 0) {
+              temp_ones.push_back(freq[i]);
+            } else {
+              temp_zeros.push_back(freq[i]);
+            }
+          }
         }
 
-        void Build(std::vector<std::vector<bool>> &alleles) {
-          // TODO: NEED TO implement UPDATE Phi data structures
+        assert(temp_combined.size() == temp_sample_beg.size());
+        assert(temp_combined.size() == temp_sample_end.size());
 
-          vector<int> u, v;
-          vector<int> freq;
-          int total_runs = 0;
-          int col = 0;
-          int cnt = 1;
-          bool prev_allele = false;
-          // TODO: Possible optimization using sdsl int vec
-          vector<int> prefix_arr(M, 0);
-          std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
-
-          // TODO: Possible optimization using sdsl int vec
-          vector<vector<unsigned int>> sites_where_sample_beg(M);
-          vector<vector<unsigned int>> sites_where_sample_end(M);
-
-          while (col < N) {
-            packed_spsi temp_zeros;
-            packed_spsi temp_ones;
-            packed_spsi temp_combined;
-            packed_spsi temp_sample_beg;
-            packed_spsi temp_sample_end;
-            bool start_with_zero = false;
-
-            for (int i = 0; i < M; ++i) {
-              // first allele
-              if (i == 0) {
-                if (alleles[col][prefix_arr[i]]) { // allele: 1
-                  v.push_back(prefix_arr[i]);
-                } else { // allele: 0
-                  u.push_back(prefix_arr[i]);
-                  start_with_zero = true;
-                }
-                temp_sample_beg.push_back(prefix_arr[i]);
-                prev_allele = alleles[col][prefix_arr[i]];
-                cnt = 1;
-                continue;
-              }
-
-              if (alleles[col][prefix_arr[i]] != prev_allele) {
-                freq.push_back(cnt);
-                prev_allele = alleles[col][prefix_arr[i]];
-                cnt = 1;
-                temp_sample_beg.push_back(prefix_arr[i]);
-                temp_sample_end.push_back(prefix_arr[i - 1]);
-              } else {
-                ++cnt;
-              }
-
-              if (alleles[col][prefix_arr[i]]) {
-                v.push_back(prefix_arr[i]);
-              } else {
-                u.push_back(prefix_arr[i]);
-              }
-            }
-            temp_sample_end.push_back(prefix_arr[M - 1]);
-
-            // edge case
-            if (cnt > 0)
-              freq.push_back(cnt);
-
-            // populate dynamic data structures
-            for (int i = 0; i < freq.size(); ++i) {
-              temp_combined.push_back(freq[i]);
-              if (start_with_zero) {
-                if (i % 2 == 0) {
-                  temp_zeros.push_back(freq[i]);
-                } else {
-                  temp_ones.push_back(freq[i]);
-                }
-              } else {
-                if (i % 2 == 0) {
-                  temp_ones.push_back(freq[i]);
-                } else {
-                  temp_zeros.push_back(freq[i]);
-                }
-              }
-            }
-
-            assert(temp_combined.size() == temp_sample_beg.size());
-            assert(temp_combined.size() == temp_sample_end.size());
-
-            for (auto i = 0; i < temp_sample_beg.size(); ++i) {
-              sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
-              sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
-            }
-
-            // build each column
-            dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
-                               (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
-                               start_with_zero, u.size());
-            columns.emplace_back(coln);
-
-            total_runs += freq.size();
-            // next col prefix arr
-            prefix_arr.clear();
-            prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
-            prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
-            ++col;
-            u.clear();
-            v.clear();
-            freq.clear();
-          } // run-through all sites
-
-          assert(columns.size() == N);
-          // build phi data-structure
-          this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, false);
-          assert(col == N);
-          total_runs += freq.size();
-          cout << "Phi support size (in bits) = " << this->phi->size_in_bytes(false) << "\n";
-          cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
+        for (auto i = 0; i < temp_sample_beg.size(); ++i) {
+          sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
+          sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
         }
-      };
+
+        // build each column
+        dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                           (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
+                           start_with_zero, u.size());
+        columns.emplace_back(coln);
+
+        total_runs += freq.size();
+
+        // next col prefix arr
+        prefix_arr.clear();
+        prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
+        prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
+        ++col;
+        u.clear();
+        v.clear();
+        freq.clear();
+      }
+      assert(columns.size() == N);
+      // build phi data-structure
+      this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, verbose);
+      assert(col == N);
+      total_runs += freq.size();
+      cout << "Phi support size (in bytes) = " << this->phi->size_in_bytes(verbose) << "\n";
+      cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
+
+      inFile.close();
+    } else {
+      std::cerr << "Couldn't find : " << filename << "\n";
+      exit(1);
+    }
+
+  }
+
+  void Build(std::vector<std::vector<bool>> &alleles) {
+    // TODO: NEED TO implement UPDATE Phi data structures
+
+    vector<int> u, v;
+    vector<int> freq;
+    int total_runs = 0;
+    int col = 0;
+    int cnt = 1;
+    bool prev_allele = false;
+    // TODO: Possible optimization using sdsl int vec
+    vector<int> prefix_arr(M, 0);
+    std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
+
+    // TODO: Possible optimization using sdsl int vec
+    vector<vector<unsigned int>> sites_where_sample_beg(M);
+    vector<vector<unsigned int>> sites_where_sample_end(M);
+
+    while (col < N) {
+      packed_spsi temp_zeros;
+      packed_spsi temp_ones;
+      packed_spsi temp_combined;
+      packed_spsi temp_sample_beg;
+      packed_spsi temp_sample_end;
+      bool start_with_zero = false;
+
+      for (int i = 0; i < M; ++i) {
+        // first allele
+        if (i == 0) {
+          if (alleles[col][prefix_arr[i]]) { // allele: 1
+            v.push_back(prefix_arr[i]);
+          } else { // allele: 0
+            u.push_back(prefix_arr[i]);
+            start_with_zero = true;
+          }
+          temp_sample_beg.push_back(prefix_arr[i]);
+          prev_allele = alleles[col][prefix_arr[i]];
+          cnt = 1;
+          continue;
+        }
+
+        if (alleles[col][prefix_arr[i]] != prev_allele) {
+          freq.push_back(cnt);
+          prev_allele = alleles[col][prefix_arr[i]];
+          cnt = 1;
+          temp_sample_beg.push_back(prefix_arr[i]);
+          temp_sample_end.push_back(prefix_arr[i - 1]);
+        } else {
+          ++cnt;
+        }
+
+        if (alleles[col][prefix_arr[i]]) {
+          v.push_back(prefix_arr[i]);
+        } else {
+          u.push_back(prefix_arr[i]);
+        }
+      }
+      temp_sample_end.push_back(prefix_arr[M - 1]);
+
+      // edge case
+      if (cnt > 0)
+        freq.push_back(cnt);
+
+      // populate dynamic data structures
+      for (int i = 0; i < freq.size(); ++i) {
+        temp_combined.push_back(freq[i]);
+        if (start_with_zero) {
+          if (i % 2 == 0) {
+            temp_zeros.push_back(freq[i]);
+          } else {
+            temp_ones.push_back(freq[i]);
+          }
+        } else {
+          if (i % 2 == 0) {
+            temp_ones.push_back(freq[i]);
+          } else {
+            temp_zeros.push_back(freq[i]);
+          }
+        }
+      }
+
+      assert(temp_combined.size() == temp_sample_beg.size());
+      assert(temp_combined.size() == temp_sample_end.size());
+
+      for (auto i = 0; i < temp_sample_beg.size(); ++i) {
+        sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
+        sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
+      }
+
+      // build each column
+      dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                         (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
+                         start_with_zero, u.size());
+      columns.emplace_back(coln);
+
+      total_runs += freq.size();
+      // next col prefix arr
+      prefix_arr.clear();
+      prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
+      prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
+      ++col;
+      u.clear();
+      v.clear();
+      freq.clear();
+    } // run-through all sites
+
+    assert(columns.size() == N);
+    // build phi data-structure
+    this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, false);
+    assert(col == N);
+    total_runs += freq.size();
+    cout << "Phi support size (in bits) = " << this->phi->size_in_bytes(false) << "\n";
+    cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
+  }
+};

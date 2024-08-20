@@ -15,9 +15,9 @@
 using namespace dyn;
 
 class phi_ds {
+ public:
   unsigned int total_haplotypes{};
   unsigned int total_sites{};
- public:
   /**
    * dynamic sparse bitvectors for phi function
    */
@@ -169,11 +169,7 @@ class phi_ds {
       tmp_col--;
     }
     auto res = static_cast<unsigned int>(this->phi_supp[pref].at(tmp_col));
-    if (res == this->total_haplotypes) {
-      return std::nullopt;
-    } else {
-      return res;
-    }
+    return res;
   }
 
   /**
@@ -188,11 +184,7 @@ class phi_ds {
       tmp_col--;
     }
     auto res = static_cast<unsigned int>(this->phi_inv_supp[pref][tmp_col]);
-    if (res == this->total_haplotypes) {
-      return std::nullopt;
-    } else {
-      return res;
-    }
+    return res;
   }
 
   // unsigned int plcp(unsigned int pref, unsigned int col) {
