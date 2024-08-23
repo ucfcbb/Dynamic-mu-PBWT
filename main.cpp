@@ -38,8 +38,9 @@ void Test_UV(DCPBWT &dcpbwt) {
 
 void Test_BottomUp_Delete(DCPBWT &dcpbwt){
   cout << "Testing Deletion BottomUp i.e. from last haplotype to first haplotype in order...\n";
-  for(int i = dcpbwt.M - 1; i >= 0; --i){
-    dcpbwt.DeleteSingleHaplotype(i);
+  int total = dcpbwt.M;
+  for(int i = total - 1; i >= 0; --i){
+    dcpbwt.DeleteSingleHaplotype(dcpbwt.M - 1);
     cout << "Deleted hap " << i << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
@@ -47,8 +48,10 @@ void Test_BottomUp_Delete(DCPBWT &dcpbwt){
 
 void Test_TopDown_Delete(DCPBWT &dcpbwt){
   cout << "Testing Deletion TopDown i.e. from first haplotype to last haplotype in order...\n";
-  for(unsigned int i = 0; i < dcpbwt.M; ++i){
-    dcpbwt.DeleteSingleHaplotype(i);
+  int total = dcpbwt.M;
+  for(unsigned int i = 0; i < total; ++i){
+    cout << "Deleting hap " << i << "\n";
+    dcpbwt.DeleteSingleHaplotype(0);
     cout << "Deleted hap " << i << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
@@ -57,14 +60,14 @@ void Test_TopDown_Delete(DCPBWT &dcpbwt){
 void Test_RandomDelete(DCPBWT& dcpbwt){
   cout << "Testing Random Deletion ...\n";
   std::mt19937 gen( std::random_device{}() );
-  while (!dcpbwt.haplotype_ids.empty()){
+  while (dcpbwt.M> 0){
     unsigned int element = 0;
-    std::sample( dcpbwt.haplotype_ids.begin(), dcpbwt.haplotype_ids.end(), &element, 1, gen );
-    cout << element << "\n";
-    if (dcpbwt.haplotype_ids.find(element) != dcpbwt.haplotype_ids.end()){
-      dcpbwt.DeleteSingleHaplotype(element);
-      cout << "Deleted hap " << element << "\n";
-    }
+//    std::sample( dcpbwt.haplotype_ids.begin(), dcpbwt.haplotype_ids.end(), &element, 1, gen );
+//    cout << element << "\n";
+//    if (dcpbwt.haplotype_ids.find(element) != dcpbwt.haplotype_ids.end()){
+//      dcpbwt.DeleteSingleHaplotype(element);
+//      cout << "Deleted hap " << element << "\n";
+//    }
   }
 //  dcpbwt.DeleteSingleHaplotype(0);
 
@@ -88,10 +91,44 @@ void Test_Insertion(string& ref_vcf_input, string& query_vcf_input, bool verbose
   for(int i = 0; i < alleles.size(); ++i) {
     dcpbwt.InsertSinglelHaplotype(alleles[i]);
     cout << "Inserted query hap: " << i << "\n";
+//    if (i == 50){
+//      packed_spsi my_spsi;
+//      cout << "Inserting all phi_inv_supp values of hapid 150\n";
+//      cout << "# elements = " << dcpbwt.phi->phi_inv_supp[150].size() << " \n";
+//      for(int i = 0;  i < dcpbwt.phi->phi_inv_supp[150].size(); ++i){
+//        my_spsi.push_back(dcpbwt.phi->phi_inv_supp[150].at(i));
+//      }
+//      cout << "Deleting 245th entry phi_inv_supp values of hapid 150\n";
+//      my_spsi.remove(245);
+//      exit(EXIT_FAILURE);
+//    }
   }
   auto time_insert = (float) (clock() - START_INSERT) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
+}
+
+void Test_Reverself(DCPBWT& dcpbwt){
+  unsigned int col = 0; unsigned int idx = 5;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 5; idx = 3;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 5; idx = 10;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 8; idx = 2;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 10; idx = 5;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 11; idx = 10;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 12; idx = 17;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 13; idx = 1;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 14; idx = 5;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
+  col = 14; idx = 19;
+  cout << "Col " << col << ", idx " << idx << " -> " <<  " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx) << "\n";
 }
 
 int main(int argc, char **argv) {
@@ -136,14 +173,17 @@ int main(int argc, char **argv) {
   }
 
   // Test_UV(dcpbwt);
+  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  Test_Reverself(dcpbwt);
 
+//
 //  vector<bool> query{false, true, false, false, true, false, true, false, false, false, true, true, true, false, true};
 //  dcpbwt.InsertSinglelHaplotype(query);
 
 //  Test_BottomUp_Delete(dcpbwt);
 //  Test_TopDown_Delete(dcpbwt);
 //  Test_RandomDelete(dcpbwt);
-  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
+//  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
 
 
   // Test_Insert();
