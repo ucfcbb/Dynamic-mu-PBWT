@@ -157,7 +157,7 @@ class DCPBWT {
     } else {
       idx -= num_zeros;
 
-      unsigned int ones_idx = this->columns[prev_col].ones.search(idx);
+      unsigned int ones_idx = this->columns[prev_col].ones.search(idx + 1);
       unsigned int run_idx = 0;
       if (this->columns[prev_col].start_with_zero) {
         run_idx = ones_idx * 2 + 1;
@@ -258,7 +258,9 @@ class DCPBWT {
                         const unsigned int hap_id,
                         bool allele,
                         packed_spsi &temp_supp,
-                        packed_spsi &temp_inv_supp) {
+                        packed_spsi &temp_inv_supp,
+                        vector<unsigned int> &temp_div_query,
+                        vector<unsigned int> &temp_div_below_query) {
 
     unsigned int run_idx = get_run_idx(col, idx);
     unsigned int hap_before = 0;
@@ -295,6 +297,10 @@ class DCPBWT {
         col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
         this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
       }
+
+      // TODO: Update div sample
+      // Replaces the previous div sample
+       this->columns[col].div_samples_beg.set(run_idx, temp_div_query[col]);
     } else {
       // If at the very top of a column
       if (idx == 0) {
@@ -324,6 +330,12 @@ class DCPBWT {
         this->phi->phi_inv_vec[this->M].set(col, true);
         temp_supp.push_back(hap_before);
         temp_inv_supp.push_back(hap_id);
+
+        // TODO: Update div sample
+        // Insert new div sample and also update the one that's below it
+        // Update the one that's below first
+         this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
+         this->columns[col].div_samples_beg.insert(0, temp_div_query[col]);
       } else {
         /* No need to create a new run
          * Simply insert into previous run
@@ -355,6 +367,9 @@ class DCPBWT {
           col_rank = this->phi->phi_vec[hap_id].rank1(col);
           this->phi->phi_supp[hap_id].set(col_rank, this->M);
         }
+
+        // TODO: Update div sample of the seq below
+        this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
       }
     }
   }
@@ -364,7 +379,9 @@ class DCPBWT {
                       const unsigned int hap_id,
                       const bool allele,
                       packed_spsi &temp_supp,
-                      packed_spsi &temp_inv_supp) {
+                      packed_spsi &temp_inv_supp,
+                      vector<unsigned int> &temp_div_query,
+                      vector<unsigned int> &temp_div_below_query) {
     if (AlleleMatchesRun(col, run_idx, allele)) {
       // Update Run info
       columns[col].combined.increment(run_idx, 1);
@@ -388,7 +405,7 @@ class DCPBWT {
       this->phi->phi_inv_vec[this->M].set(col, true);
       temp_inv_supp.push_back(UINT_MAX);
     } else {
-      // Update run info
+      // Insert run info
       this->columns[col].combined.push_back(1);
       if (allele) {
         this->columns[col].ones.push_back(1);
@@ -413,6 +430,9 @@ class DCPBWT {
       // Update for hap_before
       auto col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
       this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
+
+      // TODO: Insert Div val since this is a new run
+      this->columns[col].div_samples_beg.push_back(temp_div_query[col]);
     }
   }
 
@@ -421,16 +441,18 @@ class DCPBWT {
               const unsigned int hap_id,
               bool allele,
               packed_spsi &temp_supp,
-              packed_spsi &temp_inv_supp) {
+              packed_spsi &temp_inv_supp,
+              vector<unsigned int> &temp_div_query,
+              vector<unsigned int> &temp_div_below_query) {
     // assumes Non-empty ref panel (i.e. a panel is built prior to insertion)
     auto run_idx = get_run_idx(col, idx);
     if (isRunStart(col, run_idx, hap_id)) {
-      InsertAtRunStart(col, idx, hap_id, allele, temp_supp, temp_inv_supp);
+      InsertAtRunStart(col, idx, hap_id, allele, temp_supp, temp_inv_supp, temp_div_query, temp_div_below_query);
       return;
     }
 
     if (idx == this->M) {
-      InsertAtBottom(col, run_idx, hap_id, allele, temp_supp, temp_inv_supp);
+      InsertAtBottom(col, run_idx, hap_id, allele, temp_supp, temp_inv_supp, temp_div_query, temp_div_below_query);
       return;
     }
 
@@ -520,20 +542,96 @@ class DCPBWT {
       this->phi->phi_inv_vec[M].set(col, true);
       temp_supp.push_back(hap_before);
       temp_inv_supp.push_back(hap_after);
+
+      // TODO: Insert div value for inserted hap and the hap below it since we're forming two new head of runs
+      if (run_idx + 1 >= this->columns[col].combined.size()){
+        this->columns[col].div_samples_beg.push_back(temp_div_query[col]);
+        this->columns[col].div_samples_beg.push_back(temp_div_below_query[col]);
+      } else {
+        this->columns[col].div_samples_beg.insert(run_idx + 1, temp_div_below_query[col]);
+        this->columns[col].div_samples_beg.insert(run_idx + 1, temp_div_query[col]);
+      }
     }
+  }
+
+  /*
+     * Given a position in the PBWT:
+     * hapInd in [0,height)
+     * col in [1, width]
+     * output the value haplotype getPrefix[col] has at position col - 1
+     */
+  bool get_curr_char(unsigned int hapInd, unsigned int col) {
+    assert(hapInd >= 0 && hapInd < this->M);
+    assert(col != 0 && col <= this->N);
+    return hapInd >= this->columns[col - 1].num_zeros;
   }
 
   void InsertSinglelHaplotype(std::vector<bool> &query) {
     assert(query.size() == N);
-    vector<pair<unsigned int, unsigned int>> insertion_indices; // stores {index, hapid}
-    insertion_indices.emplace_back(M, M);
+    vector<pair<unsigned int, unsigned int>> insertion_indices(this->N + 1); // stores {index, hapid}
+    insertion_indices[0].first = this->M;
+    insertion_indices[0].second = UINT_MAX;
 
     // calculate insertion indices
-    for (unsigned int col = 1; col < query.size(); ++col) {
-      auto retval = w_mod(insertion_indices[col - 1].first, col - 1, query[col - 1], insertion_indices[col - 1].second);
-      insertion_indices.emplace_back(retval);
+    for (unsigned int col = 0; col < query.size(); ++col) {
+      insertion_indices[col + 1] = w_mod(insertion_indices[col].first, col, query[col], insertion_indices[col].second);
     }
-    // calculate divergence values
+
+    cout << insertion_indices.size() << "\n";
+    // TODO: calculate divergence values
+    vector<unsigned int> temp_div_query(this->N + 1, 0);
+    vector<unsigned int> temp_div_below_query(this->N + 1, 0);
+    // update divergence values
+    clock_t START2 = clock();
+    unsigned int zs = 0; // starting position of match between query and seqn above it
+    unsigned int bs = 0; // starting position of match between query and seqn below it
+    unsigned int hap_id_above_prev = -1;
+    for (unsigned int k = this->N; k > 0; --k) {
+      zs = k;
+      bs = k;
+      unsigned int hap_id = insertion_indices[k].second;
+      unsigned int position = insertion_indices[k].first;
+
+      // update divergence values for sequence BELOW query
+      // "starting pos" definition of divergence value
+      if (k != this->N && insertion_indices[k + 1].second == hap_id)
+        bs = temp_div_below_query[k + 1];
+      else if (position != this->M) {
+        while (bs > 0 &&
+          get_curr_char(position, bs) == query[bs - 1]) {
+//          position = reverse_lf(bs, position, verbose);
+          position = reverse_lf(bs, position);
+          --bs;
+        }
+      }
+
+      // update divergence values for query sequence
+      // "starting pos" definition of divergence value
+      position = insertion_indices[k].first;
+      if (position-- != 0) {
+        std::optional<unsigned int> hap_id_above;// = this->phi->phi(hap_id, k);;
+        if (position == this->M - 1) {
+          hap_id_above = this->columns[k].pref_samples_end.at(this->columns[k].combined.size() - 1);
+        } else {
+          hap_id_above = this->phi->phi(hap_id, k);
+        }
+        assert(hap_id_above.has_value());
+        if (k != this->N && hap_id_above_prev == hap_id_above.value())
+          zs = temp_div_query[k + 1];
+        else {
+          while (zs > 0 &&
+            get_curr_char(position, zs) == query[zs - 1]) {
+//            position = reverse_lf(zs, position, verbose);
+            position = reverse_lf(zs, position);
+            --zs;
+          }
+          hap_id_above_prev = hap_id_above.value();
+        }
+      }
+      temp_div_query[k] = zs;
+      temp_div_below_query[k] = bs;
+    }
+    temp_div_query[0] = temp_div_below_query[0] = 0;
 
     // initialize new phi structure
     suc_bv tmp_b, tmp_e;
@@ -549,7 +647,14 @@ class DCPBWT {
     // perform insertion
     // where div samples are also updated accordingly
     for (unsigned int col = 0; col < query.size(); ++col) {
-      Insert(col, insertion_indices[col].first, insertion_indices[col].second, query[col], temp_supp, temp_inv_supp);
+      Insert(col,
+             insertion_indices[col].first,
+             insertion_indices[col].second,
+             query[col],
+             temp_supp,
+             temp_inv_supp,
+             temp_div_query,
+             temp_div_below_query);
     }
 
     // handling for col == N case
@@ -1139,7 +1244,6 @@ class DCPBWT {
 
   /*
   void Build(std::vector<std::vector<bool>> &alleles) {
-    // TODO: NEED TO implement UPDATE Phi data structures
 
     vector<int> u, v;
     vector<int> freq;
@@ -1147,11 +1251,9 @@ class DCPBWT {
     int col = 0;
     int cnt = 1;
     bool prev_allele = false;
-    // TODO: Possible optimization using sdsl int vec
     vector<int> prefix_arr(M, 0);
     std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
 
-    // TODO: Possible optimization using sdsl int vec
     vector<vector<unsigned int>> sites_where_sample_beg(M);
     vector<vector<unsigned int>> sites_where_sample_end(M);
 
