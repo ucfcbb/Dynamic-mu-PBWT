@@ -40,6 +40,7 @@ class phi_ds {
    * int vector for prefix samples used by phi_inv function
    */
   std::vector<packed_spsi> phi_inv_supp;
+  std::vector<packed_spsi> phi_supp_lcp;
 //  std::unordered_map<unsigned int, packed_spsi> phi_inv_supp;
 
   phi_ds() = default;
@@ -57,7 +58,8 @@ class phi_ds {
     // sdsl::int_vector<> &last_div,
          std::vector<std::vector<unsigned int>> &site_where_samples_beg,
          std::vector<std::vector<unsigned int>> &site_where_samples_end,
-         vector<int> &last_pref,
+         vector<unsigned int> &last_pref,
+         vector<unsigned int> &last_div,
          bool verbose = false) {
     // default value is the panel height
     this->total_haplotypes = M;
@@ -69,6 +71,8 @@ class phi_ds {
 
     this->phi_supp = std::vector<packed_spsi>(total_haplotypes);
     this->phi_inv_supp = std::vector<packed_spsi>(total_haplotypes);
+
+    this->phi_supp_lcp = std::vector<packed_spsi>(total_haplotypes);
 
     // temporary vector for supports
     // std::vector<std::vector<unsigned int>> phi_supp_tmp(total_haplotypes);
@@ -106,11 +110,11 @@ class phi_ds {
         // value)
         if (j == 0) {
           this->phi_supp[columns[col].pref_samples_beg[j]].push_back(UINT_MAX);
-          // phi_supp_tmp_l[cols[i].sample_beg[j]].push_back(0);
+          this->phi_supp_lcp[columns[col].pref_samples_beg[j]].push_back(0);
         } else {
           this->phi_supp[columns[col].pref_samples_beg[j]].push_back(columns[col].pref_samples_end[j - 1]);
-          // phi_supp_tmp_l[cols[i].sample_beg[j]].push_back(
-          //         cols[i].sample_beg_lcp[j]);
+          this->phi_supp_lcp[columns[col].pref_samples_beg[j]].push_back(
+                   columns[col].div_samples_beg[j]);
         }
         // use sample end to compute phi_inv panel
         // use sample_beg to compute
@@ -133,13 +137,13 @@ class phi_ds {
         if ((this->phi_supp[last_pref[j]].size() == 0) ||
           this->phi_supp[last_pref[j]][this->phi_supp[last_pref[j]].size() - 1] != this->total_haplotypes) {
           this->phi_supp[last_pref[j]].push_back(UINT_MAX);
-          // phi_supp_tmp_l[last_pref[j]].push_back(0);
+          this->phi_supp_lcp[last_pref[j]].push_back(0);
         }
       } else {
         if ((this->phi_supp[last_pref[j]].size() == 0) ||
           this->phi_supp[last_pref[j]][this->phi_supp[last_pref[j]].size() - 1] != last_pref[j - 1]) {
           this->phi_supp[last_pref[j]].push_back(last_pref[j - 1]);
-          // phi_supp_tmp_l[last_pref[j]].push_back(last_div[j]);
+          this->phi_supp_lcp[last_pref[j]].push_back(last_div[j]);
         }
       }
       if (j == this->phi_supp.size() - 1) {
@@ -187,19 +191,20 @@ class phi_ds {
     return res;
   }
 
-  // unsigned int plcp(unsigned int pref, unsigned int col) {
-  //     if (col == 0 || !phi(pref, col).has_value()) {
-  //         return 0;
-  //     }
-  //     auto tmp_col = this->phi_rank[pref](col);
-  //     if(tmp_col == this->phi_supp[pref].size()){
-  //         tmp_col--;
-  //     }
-  //     auto end_col = this->phi_select[pref](tmp_col + 1);
-  //     auto tmp = static_cast<int>(this->phi_supp_l[pref][tmp_col]);
-  //     auto plcp = tmp - (end_col - col);
-  //     return plcp;
-  // }
+   unsigned int plcp(unsigned int pref, unsigned int col) {
+       if (col == 0 || !phi(pref, col).has_value()) {
+           return 0;
+       }
+       auto tmp_col = this->phi_vec[pref].rank1(col);
+       if(tmp_col == this->phi_supp[pref].size()){
+           tmp_col--;
+       }
+//       auto end_col = this->phi_vec[pref].select1(tmp_col + 1);
+       auto tmp = static_cast<int>(this->phi_supp_lcp[pref].at(tmp_col));
+//       auto plcp = tmp - (end_col - col);
+//       return plcp;
+      return tmp;
+   }
 
   /**
    * function to obtain size in bytes of the phi/phi_inv support data
