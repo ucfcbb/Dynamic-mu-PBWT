@@ -595,7 +595,7 @@ class DCPBWT {
     return hapInd >= this->columns[col - 1].num_zeros;
   }
 
-  void InsertSinglelHaplotype(std::vector<bool> &query) {
+  void InsertSingleHaplotype(std::vector<bool> &query) {
     assert(query.size() == N);
     vector<pair<unsigned int, unsigned int>> insertion_indices(this->N + 1); // stores {index, hapid}
     insertion_indices[0].first = this->M;
