@@ -259,6 +259,7 @@ class DCPBWT {
                         bool allele,
                         packed_spsi &temp_supp,
                         packed_spsi &temp_inv_supp,
+//                        succinct_spsi &temp_inv_supp,
                         packed_spsi &temp_div_supp,
                         vector<unsigned int> &temp_div_query,
                         vector<unsigned int> &temp_div_below_query) {
@@ -381,8 +382,11 @@ class DCPBWT {
                       const unsigned int hap_id,
                       const bool allele,
                       packed_spsi &temp_supp,
+//                      succinct_spsi &temp_supp,
                       packed_spsi &temp_inv_supp,
+//                      succinct_spsi &temp_inv_supp,
                       packed_spsi &temp_div_supp,
+//                      succinct_spsi &temp_div_supp,
                       vector<unsigned int> &temp_div_query,
                       vector<unsigned int> &temp_div_below_query) {
     if (AlleleMatchesRun(col, run_idx, allele)) {
@@ -446,14 +450,15 @@ class DCPBWT {
               bool allele,
               packed_spsi &temp_supp,
               packed_spsi &temp_inv_supp,
+//              succinct_spsi &temp_inv_supp,
               packed_spsi &temp_div_supp,
               vector<unsigned int> &temp_div_query,
               vector<unsigned int> &temp_div_below_query) {
     // assumes Non-empty ref panel (i.e. a panel is built prior to insertion)
 
-    if (col == this->N){
+    if (col == this->N) {
       unsigned int hap_above = 0;
-      if (idx == this->M){
+      if (idx == this->M) {
         hap_above = this->columns[col].pref_samples_end.at(this->columns[col].pref_samples_end.size() - 1);
       } else {
         hap_above = this->phi->phi(hap_id, col).value();
@@ -471,12 +476,28 @@ class DCPBWT {
     }
     auto run_idx = get_run_idx(col, idx);
     if (isRunStart(col, run_idx, hap_id)) {
-      InsertAtRunStart(col, idx, hap_id, allele, temp_supp, temp_inv_supp, temp_div_supp, temp_div_query, temp_div_below_query);
+      InsertAtRunStart(col,
+                       idx,
+                       hap_id,
+                       allele,
+                       temp_supp,
+                       temp_inv_supp,
+                       temp_div_supp,
+                       temp_div_query,
+                       temp_div_below_query);
       return;
     }
 
     if (idx == this->M) {
-      InsertAtBottom(col, run_idx, hap_id, allele, temp_supp, temp_inv_supp, temp_div_supp, temp_div_query, temp_div_below_query);
+      InsertAtBottom(col,
+                     run_idx,
+                     hap_id,
+                     allele,
+                     temp_supp,
+                     temp_inv_supp,
+                     temp_div_supp,
+                     temp_div_query,
+                     temp_div_below_query);
       return;
     }
 
@@ -606,7 +627,6 @@ class DCPBWT {
       insertion_indices[col + 1] = w_mod(insertion_indices[col].first, col, query[col], insertion_indices[col].second);
     }
 
-    cout << insertion_indices.size() << "\n";
     // TODO: calculate divergence values
     vector<unsigned int> temp_div_query(this->N + 1, 0);
     vector<unsigned int> temp_div_below_query(this->N + 1, 0);
@@ -670,16 +690,17 @@ class DCPBWT {
     this->phi->phi_inv_vec.push_back(tmp_e);
     packed_spsi temp_supp;
     packed_spsi temp_inv_supp;
+//    succinct_spsi temp_inv_supp;
     packed_spsi temp_div_supp;
 
     // perform insertion
     // where div samples are also updated accordingly
     for (unsigned int col = 0; col <= query.size(); ++col) {
-      if (col == query.size()){
+      if (col == query.size()) {
         Insert(col,
                insertion_indices[col].first,
                insertion_indices[col].second,
-               query[col-1],
+               query[col - 1],
                temp_supp,
                temp_inv_supp,
                temp_div_supp,
@@ -700,27 +721,9 @@ class DCPBWT {
     }
 
     // handling for col == N case
-//    unsigned int hap_above = 0;
-//    if (insertion_indices[N-1].first == this->M){
-//      hap_above = this->columns[N-1].pref_samples_end.at(this->columns[N-1].pref_samples_end.size() - 1);
-//    } else {
-//      hap_above = this->phi->phi(insertion_indices[N - 1].second, N - 1).value();
-//    }
-//    auto hap_below = insertion_indices[N - 1].second;
-//    temp_supp.push_back(hap_above);
-//    temp_inv_supp.push_back(hap_below);
     this->phi->phi_supp.push_back(temp_supp);
     this->phi->phi_inv_supp.push_back(temp_inv_supp);
     this->phi->phi_supp_lcp.push_back(temp_div_supp);
-//
-//    // Update for hap_below and hap_above too
-//    if (hap_above != UINT_MAX) {
-//      this->phi->phi_inv_supp[hap_above].set(this->phi->phi_inv_supp[hap_above].size() - 1, this->M);
-//    }
-//    if (hap_below != UINT_MAX) {
-//      this->phi->phi_supp[hap_below].set(this->phi->phi_supp[hap_below].size() - 1, this->M);
-//    }
-
     // increment total # of haplotypes
     this->haplotype_ids.insert(this->M);
     ++this->M;
@@ -1134,9 +1137,6 @@ class DCPBWT {
     --this->phi->total_haplotypes;
   }
 
-  void BuildColumn(){
-
-  }
 
   // Build the reference panel
   void BuildFromVCF(std::string &filename, bool verbose) {

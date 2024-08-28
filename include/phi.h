@@ -34,13 +34,16 @@ class phi_ds {
    * int vector for prefix samples used by phi function
    */
   std::vector<packed_spsi> phi_supp;
+//  std::vector<succinct_spsi> phi_supp;
 //  std::unordered_map<unsigned int, packed_spsi> phi_supp;
 
   /**
    * int vector for prefix samples used by phi_inv function
    */
   std::vector<packed_spsi> phi_inv_supp;
+//  std::vector<succinct_spsi> phi_inv_supp;
   std::vector<packed_spsi> phi_supp_lcp;
+//  std::vector<succinct_spsi> phi_supp_lcp;
 //  std::unordered_map<unsigned int, packed_spsi> phi_inv_supp;
 
   phi_ds() = default;
@@ -55,7 +58,6 @@ class phi_ds {
    */
   phi_ds(vector<dcpbwt_column> &columns, unsigned int M,
          unsigned int N,
-    // sdsl::int_vector<> &last_div,
          std::vector<std::vector<unsigned int>> &site_where_samples_beg,
          std::vector<std::vector<unsigned int>> &site_where_samples_end,
          vector<unsigned int> &last_pref,
@@ -71,8 +73,11 @@ class phi_ds {
 
     this->phi_supp = std::vector<packed_spsi>(total_haplotypes);
     this->phi_inv_supp = std::vector<packed_spsi>(total_haplotypes);
-
     this->phi_supp_lcp = std::vector<packed_spsi>(total_haplotypes);
+
+//    this->phi_supp = std::vector<succinct_spsi>(total_haplotypes);
+//    this->phi_inv_supp = std::vector<succinct_spsi>(total_haplotypes);
+//    this->phi_supp_lcp = std::vector<succinct_spsi>(total_haplotypes);
 
     // temporary vector for supports
     // std::vector<std::vector<unsigned int>> phi_supp_tmp(total_haplotypes);
