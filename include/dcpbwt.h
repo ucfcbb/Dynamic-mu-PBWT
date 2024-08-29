@@ -466,6 +466,7 @@ class DCPBWT {
       auto hap_below = hap_id;
       temp_supp.push_back(hap_above);
       temp_inv_supp.push_back(hap_below);
+      temp_div_supp.push_back(temp_div_query[col]);
       // Update for hap_below and hap_above too
       if (hap_above != UINT_MAX) {
         this->phi->phi_inv_supp[hap_above].set(this->phi->phi_inv_supp[hap_above].size() - 1, this->M);
@@ -720,7 +721,6 @@ class DCPBWT {
       }
     }
 
-    assert(temp_supp.size() == temp_inv_supp.size());
     assert(temp_supp.size() == temp_div_supp.size());
     // handling for col == N case
     this->phi->phi_supp.push_back(temp_supp);

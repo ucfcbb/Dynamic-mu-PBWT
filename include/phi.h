@@ -99,7 +99,7 @@ class phi_ds {
     }
 
     // iterate over columns
-    for (unsigned int col = 0; col < this->total_sites; col++) {
+    for (unsigned int col = 0; col < columns.size(); col++) {
       for (unsigned int j = 0; j < columns[col].pref_samples_beg.size(); j++) {
         // Use sample beg to compute phi panel and,
         // use sample_end to compute phi support panel.
