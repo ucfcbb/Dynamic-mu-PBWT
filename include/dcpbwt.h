@@ -267,7 +267,7 @@ class DCPBWT {
     unsigned int run_idx = get_run_idx(col, idx);
     unsigned int hap_before = 0;
     if (idx == 0) {
-      hap_before = UINT_MAX;
+      hap_before = this->M;
     } else {
       hap_before = this->columns[col].pref_samples_end[run_idx - 1];
     }
@@ -295,12 +295,12 @@ class DCPBWT {
       temp_supp.push_back(hap_before);
 
       // update phi for hap_before as well
-      if (hap_before != UINT_MAX) {
+      if (hap_before != this->M) {
         col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
         this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
       }
 
-      // TODO: Update div sample
+      // Update div sample
       // Replaces the previous div sample
       this->columns[col].div_samples_beg.set(run_idx, temp_div_query[col]);
       temp_div_supp.push_back(temp_div_query[col]);
@@ -331,7 +331,7 @@ class DCPBWT {
         // update for newly inserted head
         this->phi->phi_vec[this->M].set(col, true);
         this->phi->phi_inv_vec[this->M].set(col, true);
-        temp_supp.push_back(hap_before);
+        temp_supp.push_back(this->M);
         temp_inv_supp.push_back(hap_id);
 
         // TODO: Update div sample
@@ -339,7 +339,7 @@ class DCPBWT {
         // Update the one that's below first
         this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
         this->columns[col].div_samples_beg.insert(0, temp_div_query[col]);
-        temp_div_supp.push_back(col);
+        temp_div_supp.push_back(temp_div_query[col]);
       } else {
         /* No need to create a new run
          * Simply insert into previous run
@@ -366,13 +366,12 @@ class DCPBWT {
         temp_inv_supp.push_back(hap_id);
 
         // update phi_inv value for hap_id
-        if (hap_id != UINT_MAX) {
-          col_rank = this->phi->phi_vec[hap_id].rank1(col);
-          this->phi->phi_supp[hap_id].set(col_rank, this->M);
-
-          // TODO: Update div sample of the seq below
-          this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
-        }
+        // if (hap_id != UINT_MAX)  <- this should NEVER happen
+        assert(hap_id != this->M);
+        col_rank = this->phi->phi_vec[hap_id].rank1(col);
+        this->phi->phi_supp[hap_id].set(col_rank, this->M);
+        // TODO: Update div sample of the seq below
+        this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
       }
     }
   }
@@ -450,7 +449,6 @@ class DCPBWT {
               bool allele,
               packed_spsi &temp_supp,
               packed_spsi &temp_inv_supp,
-//              succinct_spsi &temp_inv_supp,
               packed_spsi &temp_div_supp,
               vector<unsigned int> &temp_div_query,
               vector<unsigned int> &temp_div_below_query) {
@@ -690,7 +688,6 @@ class DCPBWT {
     this->phi->phi_inv_vec.push_back(tmp_e);
     packed_spsi temp_supp;
     packed_spsi temp_inv_supp;
-//    succinct_spsi temp_inv_supp;
     packed_spsi temp_div_supp;
 
     // perform insertion
