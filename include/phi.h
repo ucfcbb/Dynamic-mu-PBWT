@@ -132,7 +132,8 @@ class phi_ds {
       // Update phi_supp
       if (j == 0) {
         if ((this->phi_supp[last_pref[j]].size() == 0) ||
-          this->phi_supp[last_pref[j]].at(this->phi_supp[last_pref[j]].size() - 1) != last_pref[j]) { // checks if it's already at the top prior to the last column
+          this->phi_supp[last_pref[j]].at(this->phi_supp[last_pref[j]].size() - 1)
+            != last_pref[j]) { // checks if it's already at the top prior to the last column
           this->phi_supp[last_pref[j]].push_back(last_pref[j]);
           this->phi_supp_lcp[last_pref[j]].push_back(total_sites);
         }

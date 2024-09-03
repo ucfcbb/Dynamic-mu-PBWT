@@ -80,6 +80,17 @@ void Test_Insertion(string &ref_vcf_input, string &query_vcf_input, bool verbose
   auto time_insert = (float) (clock() - START_INSERT) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
+
+  // go through all query haplotypes
+  clock_t START_DELETE = clock();
+  int total_delete = 1000;
+  for (int i = 0; i < total_delete; ++i) {
+    dcpbwt.DeleteSingleHaplotype(10);
+    cout << "Deleted query hap: " << i + 10 << "\n";
+  }
+  auto time_del = (float) (clock() - START_DELETE) / CLOCKS_PER_SEC;
+  cout << "Deleted " << total_delete << " haplotypes.\n";
+  cout << "Deletion took: " << time_del << " s.\n";
 }
 
 void Test_10Insertions(DCPBWT &dcpbwt) {
@@ -98,7 +109,6 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
   for (int i = 0; i < data.size(); ++i) {
     dcpbwt.InsertSingleHaplotype(data[i]);
     cout << "Inserted Hap " << i << "\n";
-    dcpbwt.phi->phi(0, 1);
   }
 
   assert(dcpbwt.M == 30);
@@ -161,11 +171,13 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
     cout << "Col " << col << " passed !\n";
   }
   cout << "Passed !\n";
+
   cout << "Testing Prefix Samples End: \n";
   for (int col = 0; col <= dcpbwt.N; ++col) {
     assert(dcpbwt.columns[col].pref_samples_end.size() == expected_pref_end[col].size());
     for (int j = 0; j < expected_pref_end[col].size(); ++j) {
       assert(dcpbwt.columns[col].pref_samples_end.at(j) == expected_pref_end[col][j]);
+      cout << "Passed index i = "  << j << "\n";
     }
     cout << "Col " << col << " passed !\n";
   }
@@ -175,10 +187,53 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
     assert(dcpbwt.columns[col].div_samples_beg.size() == expected_div_beg[col].size());
     for (int j = 0; j < expected_div_beg[col].size(); ++j) {
       assert(dcpbwt.columns[col].div_samples_beg.at(j) == expected_div_beg[col][j]);
+      cout << "Passed index i = "  << j << "\n";
     }
     cout << "Col " << col << " passed !\n";
   }
   cout << "Passed !\n";
+
+  cout << "Testing phi structures :\n";
+  vector<vector<int>> expected_phi_supp = {
+    {0, 29, 24, 21, 23, 15, 0, 0, 0, 21,   15}, //0
+    {0, 21, 18, 23, 25, 19, 1,   20}, // 1
+    {1, 25,   6}, // 2
+    {2}, // 3
+    {3, 4, 23, 3, 0, 17,     18}, // 4
+    {4}, // 5
+    {5}, // 6
+    {6, 7, 8}, // 7
+    {7, 8, 16, 24, 13}, // 8
+    {8, 7, 0, 15, 1}, // 9
+    {9 }, //10
+    {10, 8, 16, 29, 22, 3, 28}, // 11
+    {11, 10, 23, 27, 26, 11, 3}, // 12
+    {12}, // 13
+    {}, // 14
+    {}, // 15
+    {}, // 16
+    {16, 3, }, // 17
+    {17, }, // 18
+    {}, // 19
+    {}, // 20
+    {}, // 21
+    {21, }, // 22
+    {22, }, // 23
+    {23, }, // 24
+    {}, // 25
+    {25, }, // 26
+    {}, // 27
+    {}, // 28
+    {28, }, // 29
+    };
+
+  for(int i = 0; i < 14; ++i){
+    assert(expected_phi_supp[i].size() == dcpbwt.phi->phi_supp[i].size());
+    for(int j = 0; j < expected_phi_supp[i].size(); ++j){
+      assert(expected_phi_supp[i][j] == dcpbwt.phi->phi_supp[i].at(j));
+    }
+    cout << "Passed phi supp for hap " << i << '\n';
+  }
 }
 
 void Test_Reverself(DCPBWT &dcpbwt) {
@@ -266,6 +321,7 @@ int main(int argc, char **argv) {
   }
 
 //  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
+//  Test_Deletion(ref_vcf_input, query_vcf_input, verbose);
   DCPBWT dcpbwt(ref_vcf_input, verbose);
   Test_10Insertions(dcpbwt);
   // Test_UV(dcpbwt);

@@ -309,7 +309,6 @@ class DCPBWT {
       // Replaces the previous div sample
       this->columns[col].div_samples_beg.set(run_idx, temp_div_query[col]);
       temp_div_supp.push_back(temp_div_query[col]);
-
     } else {
       // If at the very top of a column
       if (idx == 0) {
@@ -442,7 +441,7 @@ class DCPBWT {
       assert(run_idx == this->columns[col].pref_samples_end.size() - 1);
       unsigned int hap_before = this->columns[col].pref_samples_end.at(run_idx);
 
-      // update pref beg/end
+      // Update pref beg/end
       this->columns[col].pref_samples_beg.push_back(this->M);
       this->columns[col].pref_samples_end.push_back(this->M);
 
@@ -909,7 +908,7 @@ class DCPBWT {
 
     // Unset Phi for hap_id
     col_rank = this->phi->phi_vec[hap_id].rank1(col);
-    if (this->phi->phi_supp[hap_id].size() > 1) {
+    if (this->phi->phi_supp[hap_id].size() > 1){
       this->phi->phi_supp[hap_id].remove(col_rank);
       this->phi->phi_supp_lcp[hap_id].remove(col_rank);
     }
