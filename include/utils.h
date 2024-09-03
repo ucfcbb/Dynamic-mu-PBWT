@@ -148,4 +148,6 @@ inline void ReadVCF(string &filename, vector<vector<bool>> &alleles) {
   std::cout << "M (# of haplotypes) = " << M << " : N (# of sites) = " << N << "\n";
 }
 
+
+
 #endif //DCPBWT_INCLUDE_UTILS_H_
