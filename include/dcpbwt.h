@@ -1042,6 +1042,32 @@ class DCPBWT {
       }
     }
   }
+  /*
+   * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)
+   * Result: Deletes that haplotype's allele from all columns
+   */
+  void DeleteSingleHaplotype_v2(const unsigned int hap_id) {
+    if (this->M == 0) {
+      cerr << "Panel is empty. Nothing to delete! \n";
+      return;
+    }
+    if (hap_id >= this->M) {
+      cerr << "Invalid haplotype to delete! Hap Id should be in the range [0, " << this->M << ").\n";
+      return;
+    }
+
+    // Get the mappings
+    vector<pair<unsigned int, unsigned int>> haplotype_info(this->N + 1); // {index, hapid}
+    vector<bool> alleles;
+    haplotype_info[0].first = hap_id;
+    haplotype_info[0].second = hap_id;
+
+    // Delete
+
+    // if (hap_id < this->M - 1){
+    // Replace the deleted hap_id with this->M - 1
+    // }
+  }
 
   /*
    * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)

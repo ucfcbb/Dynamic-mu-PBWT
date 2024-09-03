@@ -350,9 +350,24 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
+//  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
 //  Test_Deletion(ref_vcf_input, query_vcf_input, verbose);
-//  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  dcpbwt.DeleteSingleHaplotype(19);
+  dcpbwt.DeleteSingleHaplotype(4);
+  vector<bool> query = {false, true, true, false, true, false, true, false, false, false, false, false, true, false, true};
+  vector<pair<unsigned int, unsigned int>> insertion_indices(dcpbwt.N + 1); // stores {index, hapid}
+  insertion_indices[0].first = 4;
+  insertion_indices[0].second = 5;
+
+  // Calculate insertion indices
+  for (unsigned int col = 0; col < query.size(); ++col) {
+    insertion_indices[col + 1] = dcpbwt.w_mod(insertion_indices[col].first, col, query[col], insertion_indices[col].second);
+  }
+
+  for(int i = 0; i < insertion_indices.size(); ++i){
+    cout << insertion_indices[i].first << " : " << insertion_indices[i].second << "\n";
+  }
 //  Test_10Insertions(dcpbwt);
   return (EXIT_SUCCESS);
 }
