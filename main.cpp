@@ -77,7 +77,7 @@ void Test_Insertion(string &ref_vcf_input, string &query_vcf_input, bool verbose
   clock_t START_INSERT = clock();
   for (int i = 0; i < alleles.size(); ++i) {
     dcpbwt.InsertSingleHaplotype(alleles[i]);
-    cout << "Inserted query hap: " << i << "\n";
+//    cout << "Inserted query hap: " << i << "\n";
   }
   auto time_insert = (float) (clock() - START_INSERT) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
