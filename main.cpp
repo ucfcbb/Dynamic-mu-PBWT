@@ -83,16 +83,16 @@ void Test_Insertion(string &ref_vcf_input, string &query_vcf_input, bool verbose
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
 
-  // go through all query haplotypes
-  clock_t START_DELETE = clock();
-  int total_delete = 1000;
-  for (int i = 0; i < total_delete; ++i) {
-    dcpbwt.DeleteSingleHaplotype(10);
-    cout << "Deleted query hap: " << i + 10 << "\n";
-  }
-  auto time_del = (float) (clock() - START_DELETE) / CLOCKS_PER_SEC;
-  cout << "Deleted " << total_delete << " haplotypes.\n";
-  cout << "Deletion took: " << time_del << " s.\n";
+//  // go through all query haplotypes
+//  clock_t START_DELETE = clock();
+//  int total_delete = 1000;
+//  for (int i = 0; i < total_delete; ++i) {
+//    dcpbwt.DeleteSingleHaplotype(10);
+//    cout << "Deleted query hap: " << i + 10 << "\n";
+//  }
+//  auto time_del = (float) (clock() - START_DELETE) / CLOCKS_PER_SEC;
+//  cout << "Deleted " << total_delete << " haplotypes.\n";
+//  cout << "Deletion took: " << time_del << " s.\n";
 }
 
 void Test_10Insertions(DCPBWT &dcpbwt) {
