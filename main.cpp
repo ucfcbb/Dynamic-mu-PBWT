@@ -265,9 +265,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
-//  DCPBWT dcpbwt(ref_vcf_input, verbose);
-//  Test_10Insertions(dcpbwt);
+//  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
+  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  Test_10Insertions(dcpbwt);
   // Test_UV(dcpbwt);
 //  Test_Reverself(dcpbwt);
 
