@@ -9,7 +9,9 @@
 void PrintHelp() {
   std::cout << "Usage: dcpbwt [options]\n" << std::endl;
   std::cout << "Options:" << std::endl;
-  std::cout << "  -i, --input_file <path>\t vcf file for panel" << std::endl;
+  std::cout << "  -i, --input ref <path>\t vcf file for panel" << std::endl;
+  std::cout << "  -q, --input query <path>\t vcf file for panel" << std::endl;
+  std::cout << "  -l, --input length <int>\t of match" << std::endl;
   std::cout << "  -v, --verbose <path>\t show detail information" << std::endl;
   std::cout << "  -h, --help\t show this help message and exit" << std::endl;
 }
