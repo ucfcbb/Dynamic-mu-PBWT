@@ -291,6 +291,7 @@ class DCPBWT {
       // Handle for the N-th column
       if (col == this->N){
         this->phi->phi_supp[hap_id].set(this->phi->phi_supp[hap_id].size() - 1, this->M);
+        temp_inv_supp.push_back(hap_id);
       } else{
         this->phi->phi_supp[hap_id].remove(col_rank);
       }

@@ -162,7 +162,9 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
                                            {13, 11, 7, 11, 7, 9, 8, 10, 3},
                                            {14, 12, 11, 9, 11, 12, 11, 9},
                                            {15, 15}};
+  cout << "############################## \n";
   cout << "Testing Prefix Samples Begin: \n";
+  cout << "############################## \n";
   for (int col = 0; col <= dcpbwt.N; ++col) {
     assert(dcpbwt.columns[col].pref_samples_beg.size() == expected_pref_beg[col].size());
     for (int j = 0; j < expected_pref_beg[col].size(); ++j) {
@@ -170,30 +172,35 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
     }
     cout << "Col " << col << " passed !\n";
   }
-  cout << "Passed !\n";
+  cout << "Passed !\n\n";
 
+  cout << "############################## \n";
   cout << "Testing Prefix Samples End: \n";
+  cout << "############################## \n";
   for (int col = 0; col <= dcpbwt.N; ++col) {
     assert(dcpbwt.columns[col].pref_samples_end.size() == expected_pref_end[col].size());
     for (int j = 0; j < expected_pref_end[col].size(); ++j) {
       assert(dcpbwt.columns[col].pref_samples_end.at(j) == expected_pref_end[col][j]);
-      cout << "Passed index i = "  << j << "\n";
     }
     cout << "Col " << col << " passed !\n";
   }
-  cout << "Passed !\n";
+  cout << "Passed !\n\n";
+
+  cout << "############################## \n";
   cout << "Testing Div Samples Beg: \n";
+  cout << "############################## \n";
   for (int col = 0; col <= dcpbwt.N; ++col) {
     assert(dcpbwt.columns[col].div_samples_beg.size() == expected_div_beg[col].size());
     for (int j = 0; j < expected_div_beg[col].size(); ++j) {
       assert(dcpbwt.columns[col].div_samples_beg.at(j) == expected_div_beg[col][j]);
-      cout << "Passed index i = "  << j << "\n";
     }
     cout << "Col " << col << " passed !\n";
   }
-  cout << "Passed !\n";
+  cout << "Passed !\n\n";
 
+  cout << "############################## \n";
   cout << "Testing phi structures :\n";
+  cout << "############################## \n";
   vector<vector<int>> expected_phi_supp = {
     {0, 29, 24, 21, 23, 15, 0, 0, 0, 21,   15}, //0
     {0, 21, 18, 23, 25, 19, 1,   20}, // 1
@@ -209,30 +216,75 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
     {10, 8, 16, 29, 22, 3, 28}, // 11
     {11, 10, 23, 27, 26, 11, 3}, // 12
     {12}, // 13
-    {}, // 14
-    {}, // 15
-    {}, // 16
-    {16, 3, }, // 17
-    {17, }, // 18
-    {}, // 19
-    {}, // 20
-    {}, // 21
-    {21, }, // 22
-    {22, }, // 23
-    {23, }, // 24
-    {}, // 25
-    {25, }, // 26
-    {}, // 27
-    {}, // 28
-    {28, }, // 29
+    {13, 14, 14, 14, 14, 22, 1, 19}, // 14
+    {14}, // 15
+    {15, 10, 0}, // 16
+    {16, 3, 29, 20, 15, 29, 3, 18, 16}, // 17
+    {17, 16, 23, 24, 13, 11, 16, 28, 26}, // 18
+    {18, 24, 20, 7}, // 19
+    {19, 16, 15, 13, 28, 26, 29}, // 20
+    {20, 21, 21, 27, 28, 23}, // 21
+    {21, 17, 20, 3, 10}, // 22
+    {22, 3, 24, 28, 15, 29, 25, 27, 10, 15, 11}, // 23
+    {23, 21, 28, 22, 29, 21, 13, 26, 22}, // 24
+    {24, 20, 16, 3, 21, 27, 19, 6, 17}, // 25
+    {25, 23, 22, 17, 15, 7, 11, 22, 21}, // 26
+    {26, 19, 20, 24}, // 27
+    {27, 26, 13, 23, 10, 28, 28}, // 28 last 28 might be excessive and we could may be add checks to not add that?
+    {28, 25, 21, 10, 22, 25}, // 29
     };
 
-  for(int i = 0; i < 14; ++i){
+  for(int i = 0; i < 30; ++i){
     assert(expected_phi_supp[i].size() == dcpbwt.phi->phi_supp[i].size());
     for(int j = 0; j < expected_phi_supp[i].size(); ++j){
       assert(expected_phi_supp[i][j] == dcpbwt.phi->phi_supp[i].at(j));
     }
     cout << "Passed phi supp for hap " << i << '\n';
+  }
+  cout << "\n";
+
+  cout << "############################## \n";
+  cout << "Testing phi inv structures :\n";
+  cout << "############################## \n";
+  vector<vector<int>> expected_phi_inv_supp = {
+    {1, 4, 9, 16}, //0
+    {2, 14, 9}, // 1
+    {3}, // 2
+    {4, 17, 23, 4, 25, 17, 22, 11, 12}, // 3
+    {5}, // 4
+    {6}, // 5
+    {7, 25, 2}, // 6
+    {8, 9, 7, 26, 19}, // 7
+    {9, 11, 8, 8, 8, 7}, // 8
+    {10}, // 9
+    {11, 16, 12, 29, 23, 28, 22 }, //10
+    {12, 18, 26, 12, 23}, // 11
+    {13}, // 12
+    {14, 20, 18, 28, 24, 8}, // 13
+    {15}, // 14
+    {16, 20, 17, 26, 23, 0, 9, 23, 0}, // 15
+    {17, 18, 20, 25, 8, 11, 18, 17}, // 16
+    {18, 22, 26, 4, 25}, // 17
+    {19, 1, 17, 4}, // 18
+    {20, 27, 25, 1, 14}, // 19
+    {21, 25, 17, 22, 19, 27, 1}, // 20
+    {22, 24, 0, 1, 25, 29, 24, 0, 26}, // 21
+    {23, 26, 24, 14, 29, 11, 26, 24}, // 22
+    {24, 26, 4, 18, 0, 1, 12, 28, 21}, // 23
+    {25, 0, 23, 18, 19, 24, 24, 8, 27}, // 24
+    {26, 29, 23, 1, 2, 29}, // 25
+    {27, 28, 20, 12, 24, 18}, // 26
+    {28, 27, 21, 25, 23, 12, 27, 27, 27}, // 27
+    {29, 28, 28, 24, 23, 20, 21, 18, 11}, // 28 last 28 might be excessive and we could may be add checks to not add that?
+    {29, 0, 17, 29, 29, 17, 29, 23, 24, 11, 20}, // 29
+  };
+
+  for(int i = 0; i < 30; ++i){
+    assert(expected_phi_inv_supp[i].size() == dcpbwt.phi->phi_inv_supp[i].size());
+    for(int j = 0; j < expected_phi_inv_supp[i].size(); ++j){
+      assert(expected_phi_inv_supp[i][j] == dcpbwt.phi->phi_inv_supp[i].at(j));
+    }
+    cout << "Passed phi inv supp for hap " << i << '\n';
   }
 }
 
