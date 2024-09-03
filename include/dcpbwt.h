@@ -1053,10 +1053,9 @@ class DCPBWT {
       return;
     }
     if (idx >= this->M) {
-      cerr << "Invalid index to delete! Index should be in the range [0, " << this->M << "].\n";
+      cerr << "Invalid index to delete! Index should be in the range [0, " << this->M << ").\n";
       return;
     }
-    assert (idx < this->M);
 
     // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
     // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
@@ -1065,9 +1064,6 @@ class DCPBWT {
     auto it = haplotype_ids.begin();
     std::advance(it, idx);
     unsigned int hap_id = *it;
-//    unsigned int idx = 0;
-//    auto ret = find(haplotype_ids.begin(), haplotype_ids.end(), hap_id);
-//    idx = distance(haplotype_ids.begin(), ret);
 
     vector<pair<unsigned int, unsigned int>> haplotype_info(this->N + 1); // {index, hapid}
     vector<bool> alleles;

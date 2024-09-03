@@ -293,40 +293,8 @@ void Test_Reverself(DCPBWT &dcpbwt) {
   unsigned int idx = 5;
   cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
        << "\n";
-  col = 5;
-  idx = 3;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 5;
-  idx = 10;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 8;
-  idx = 2;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 10;
-  idx = 5;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 11;
-  idx = 10;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
   col = 12;
   idx = 17;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 13;
-  idx = 1;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 14;
-  idx = 5;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 14;
-  idx = 19;
   cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
        << "\n";
 }
@@ -371,25 +339,18 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
   }
+  if (!filesystem::exists(ref_vcf_input)){
+    cerr << "Specified ref vcf : " << ref_vcf_input << " doesn't exist!\n";
+    exit(EXIT_FAILURE);
+  }
+  if (!filesystem::exists(query_vcf_input)){
+    cerr << "Specified query vcf : " << query_vcf_input << " doesn't exist!\n";
+    exit(EXIT_FAILURE);
+  }
 
-//  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
+  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
 //  Test_Deletion(ref_vcf_input, query_vcf_input, verbose);
-  DCPBWT dcpbwt(ref_vcf_input, verbose);
-  Test_10Insertions(dcpbwt);
-  // Test_UV(dcpbwt);
-//  Test_Reverself(dcpbwt);
-
-//
-//  vector<bool> query{false, true, false, false, true, false, true, false, false, false, true, true, true, false, true};
-//  dcpbwt.InsertSinglelHaplotype(query);
-//  dcpbwt.DeleteSingleHaplotype(20);
-
-//  Test_BottomUp_Delete(dcpbwt);
-//  Test_TopDown_Delete(dcpbwt);
-//  Test_RandomDelete(dcpbwt);
-
-
-
-  // Test_Insert();
+//  DCPBWT dcpbwt(ref_vcf_input, verbose);
+//  Test_10Insertions(dcpbwt);
   return (EXIT_SUCCESS);
 }
