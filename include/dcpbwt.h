@@ -402,14 +402,14 @@ class DCPBWT {
       unsigned int old_bottom = this->columns[col].pref_samples_end.at(run_idx);
       this->columns[col].pref_samples_end.set(run_idx, this->M);
 
-      // Update old bottom's Phi structures
+      // Update old bottom's Phi_inv structures
       auto col_rank = this->phi->phi_inv_vec[old_bottom].rank1(col);
       this->phi->phi_inv_supp[old_bottom].remove(col_rank);
       this->phi->phi_inv_vec[old_bottom].set(col, false);
 
-      // Update new bottom's Phi structures
+      // Update new bottom's Phi_inv structures
       this->phi->phi_inv_vec[this->M].set(col, true);
-      temp_inv_supp.push_back(UINT_MAX);
+      temp_inv_supp.push_back(this->M);
     } else {
       // Insert run info
       this->columns[col].combined.push_back(1);
@@ -431,13 +431,13 @@ class DCPBWT {
       this->phi->phi_vec[this->M].set(col, true);
       this->phi->phi_inv_vec[this->M].set(col, true);
       temp_supp.push_back(hap_before);
-      temp_inv_supp.push_back(UINT_MAX);
+      temp_inv_supp.push_back(this->M);
 
-      // Update for hap_before
+      // Update phi_inv for hap_before
       auto col_rank = this->phi->phi_inv_vec[hap_before].rank1(col);
       this->phi->phi_inv_supp[hap_before].set(col_rank, this->M);
 
-      // TODO: Insert Div val since this is a new run
+      // Insert Div val since this is a new run
       this->columns[col].div_samples_beg.push_back(temp_div_query[col]);
       temp_div_supp.push_back(temp_div_query[col]);
     }
