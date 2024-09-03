@@ -621,31 +621,30 @@ class DCPBWT {
     assert(query.size() == N);
     vector<pair<unsigned int, unsigned int>> insertion_indices(this->N + 1); // stores {index, hapid}
     insertion_indices[0].first = this->M;
-    insertion_indices[0].second = UINT_MAX;
+    insertion_indices[0].second = this->M;
 
-    // calculate insertion indices
+    // Calculate insertion indices
     for (unsigned int col = 0; col < query.size(); ++col) {
       insertion_indices[col + 1] = w_mod(insertion_indices[col].first, col, query[col], insertion_indices[col].second);
     }
 
-    // TODO: calculate divergence values
-    vector<unsigned int> temp_div_query(this->N + 1, 0);
-    vector<unsigned int> temp_div_below_query(this->N + 1, 0);
-    // update divergence values
+    // Calculate divergence values
+    vector<unsigned int> temp_div_seqn(this->N + 1, 0);
+    vector<unsigned int> temp_div_below_seqn(this->N + 1, 0);
     clock_t START2 = clock();
-    unsigned int zs = 0; // starting position of match between query and seqn above it
-    unsigned int bs = 0; // starting position of match between query and seqn below it
+    unsigned int zs = 0; // starting position of match between inserted seqn and seqn above it
+    unsigned int bs = 0; // starting position of match between inserted seqn and seqn below it
     unsigned int hap_id_above_prev = -1;
     for (unsigned int k = this->N; k > 0; --k) {
       zs = k;
       bs = k;
-      unsigned int hap_id = insertion_indices[k].second;
       unsigned int position = insertion_indices[k].first;
+      unsigned int hap_id = insertion_indices[k].second;
 
       // update divergence values for sequence BELOW query
       // "starting pos" definition of divergence value
       if (k != this->N && insertion_indices[k + 1].second == hap_id)
-        bs = temp_div_below_query[k + 1];
+        bs = temp_div_below_seqn[k + 1];
       else if (position != this->M) {
         while (bs > 0 &&
           get_curr_char(position, bs) == query[bs - 1]) {
@@ -666,7 +665,7 @@ class DCPBWT {
         }
         assert(hap_id_above.has_value());
         if (k != this->N && hap_id_above_prev == hap_id_above.value())
-          zs = temp_div_query[k + 1];
+          zs = temp_div_seqn[k + 1];
         else {
           while (zs > 0 &&
             get_curr_char(position, zs) == query[zs - 1]) {
@@ -676,10 +675,10 @@ class DCPBWT {
           hap_id_above_prev = hap_id_above.value();
         }
       }
-      temp_div_query[k] = zs;
-      temp_div_below_query[k] = bs;
+      temp_div_seqn[k] = zs;
+      temp_div_below_seqn[k] = bs;
     }
-    temp_div_query[0] = temp_div_below_query[0] = 0;
+    temp_div_seqn[0] = temp_div_below_seqn[0] = 0;
 
     // initialize new phi structure
     suc_bv tmp_b, tmp_e;
@@ -705,8 +704,8 @@ class DCPBWT {
                temp_supp,
                temp_inv_supp,
                temp_div_supp,
-               temp_div_query,
-               temp_div_below_query);
+               temp_div_seqn,
+               temp_div_below_seqn);
 
       } else {
         Insert(col,
@@ -716,8 +715,8 @@ class DCPBWT {
                temp_supp,
                temp_inv_supp,
                temp_div_supp,
-               temp_div_query,
-               temp_div_below_query);
+               temp_div_seqn,
+               temp_div_below_seqn);
       }
     }
 
