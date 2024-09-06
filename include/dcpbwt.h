@@ -83,7 +83,7 @@ class DCPBWT {
   }
 
   std::pair<unsigned int, unsigned int> column_end_lf(unsigned int col, bool val) {
-    if (val) { return {this->M, this->M}; } // last row, invalid hapID
+    if (val) { return {this->M, UINT_MAX}; } // last row, invalid hapID
     unsigned int ind = columns[col].num_zeros;
     unsigned int ridx = 0; // assume column starts with a run of ones
     if (columns[col].start_with_zero) { // the second run at index 1 will be run of ones
@@ -295,6 +295,7 @@ class DCPBWT {
         temp_inv_supp.push_back(hap_id);
       } else {
         this->phi->phi_supp[hap_id].remove(col_rank);
+        this->phi->phi_supp_lcp[hap_id].remove(col_rank);
       }
 
       // set phi for new run head
@@ -334,6 +335,7 @@ class DCPBWT {
         // update phi for old run head
         auto col_rank = this->phi->phi_vec[hap_id].rank1(col);
         this->phi->phi_supp[hap_id].set(col_rank, inserted_hap_id);
+        this->phi->phi_supp_lcp[hap_id].set(col_rank, temp_div_below_query[col]);
 
         // update for newly inserted head
         this->phi->phi_vec[inserted_hap_id].set(col, true);
@@ -384,7 +386,8 @@ class DCPBWT {
         assert(hap_id != inserted_hap_id);
         col_rank = this->phi->phi_vec[hap_id].rank1(col);
         this->phi->phi_supp[hap_id].set(col_rank, inserted_hap_id);
-        // TODO: Update div sample of the seq below
+        // Update div sample of the seq below
+        this->phi->phi_supp_lcp[hap_id].set(col_rank, temp_div_below_query[col]);
         this->columns[col].div_samples_beg.set(run_idx, temp_div_below_query[col]);
       }
     }
@@ -396,11 +399,8 @@ class DCPBWT {
                       const unsigned int inserted_hap_id,
                       const bool allele,
                       packed_spsi &temp_supp,
-//                      succinct_spsi &temp_supp,
                       packed_spsi &temp_inv_supp,
-//                      succinct_spsi &temp_inv_supp,
                       packed_spsi &temp_div_supp,
-//                      succinct_spsi &temp_div_supp,
                       vector<unsigned int> &temp_div_query,
                       vector<unsigned int> &temp_div_below_query) {
     if (AlleleMatchesRun(col, run_idx, allele)) {
@@ -521,8 +521,8 @@ class DCPBWT {
         unsigned int hap_before = hap_before_opt.value();
         unsigned int hap_after = hap_id;
 
-        this->phi->phi_supp[hap_after].set(this->phi->phi_supp[hap_after].size() - 1, this->M);
-        this->phi->phi_inv_supp[hap_before].set(this->phi->phi_inv_supp[hap_before].size() - 1, this->M);
+        this->phi->phi_supp[hap_after].set(this->phi->phi_supp[hap_after].size() - 1, inserted_hap_id);
+        this->phi->phi_inv_supp[hap_before].set(this->phi->phi_inv_supp[hap_before].size() - 1, inserted_hap_id);
         temp_supp.push_back(hap_before);
         temp_inv_supp.push_back(hap_after);
         temp_div_supp.push_back(temp_div_query[col]);
@@ -1241,8 +1241,8 @@ class DCPBWT {
           Insert(col,
                  insertion_indices[col].first,
                  insertion_indices[col].second,
-                 last_hap_alleles[col - 1],
                  hap_id,
+                 last_hap_alleles[col - 1],
                  temp_supp,
                  temp_inv_supp,
                  temp_div_supp,
