@@ -193,8 +193,8 @@ class phi_ds {
   }
 
    unsigned int plcp(unsigned int pref, unsigned int col) {
-       if (col == 0 || !phi(pref, col).has_value()) {
-           return 0;
+       if (col == 0 || (phi(pref, col).value() == phi_inv(pref, col).value())) {
+           return col;
        }
        auto tmp_col = this->phi_vec[pref].rank1(col);
        if(tmp_col == this->phi_supp[pref].size()){

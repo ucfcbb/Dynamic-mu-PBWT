@@ -42,7 +42,7 @@ void Test_BottomUp_Delete(DCPBWT &dcpbwt) {
   cout << "Testing Deletion BottomUp i.e. from last haplotype to first haplotype in order...\n";
   int total = dcpbwt.M;
   for (int i = total - 1; i >= 0; --i) {
-    dcpbwt.DeleteSingleHaplotype(dcpbwt.M - 1);
+    dcpbwt.DeleteSingleHaplotype_v2(dcpbwt.M - 1);
     cout << "Deleted hap " << i << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
@@ -51,10 +51,10 @@ void Test_BottomUp_Delete(DCPBWT &dcpbwt) {
 void Test_TopDown_Delete(DCPBWT &dcpbwt) {
   cout << "Testing Deletion TopDown i.e. from first haplotype to last haplotype in order...\n";
   int total = dcpbwt.M;
+  int hap_id = 0;
   for (unsigned int i = 0; i < total; ++i) {
-    cout << "Deleting hap " << i << "\n";
-    dcpbwt.DeleteSingleHaplotype(0);
-    cout << "Deleted hap " << i << "\n";
+    dcpbwt.DeleteSingleHaplotype_v2(hap_id);
+    cout <<i << ". Deleted hap " << hap_id << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
 }
@@ -351,8 +351,10 @@ int main(int argc, char **argv) {
   }
 
 //  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
-//  Test_Deletion(ref_vcf_input, query_vcf_input, verbose);
   DCPBWT dcpbwt(ref_vcf_input, verbose);
+//  Test_TopDown_Delete(dcpbwt);
+  Test_BottomUp_Delete(dcpbwt);
+  return 0;
   dcpbwt.DeleteSingleHaplotype_v2(4);
 
   // Test for phi supp and phi inv supp for hap_id = 4
