@@ -193,7 +193,7 @@ class phi_ds {
   }
 
    unsigned int plcp(unsigned int pref, unsigned int col) {
-       if (col == 0 || (phi(pref, col).value() == phi_inv(pref, col).value())) {
+       if (col == 0 || pref == UINT_MAX || (phi(pref, col).value() == phi_inv(pref, col).value()) || (phi(pref, col).value() == pref)) {
            return col;
        }
        auto tmp_col = this->phi_vec[pref].rank1(col);
@@ -204,7 +204,7 @@ class phi_ds {
 //       auto end_col = this->phi_vec[pref].select1(tmp_col + 1);
        unsigned int match_start = 0;
        if (tmp_col > 0){
-         match_start = static_cast<int>(this->phi_supp_lcp[pref].at(tmp_col - 1));
+         match_start = static_cast<int>(this->phi_supp_lcp[pref].at(tmp_col));
 
        } else{
          assert(tmp_col == 0);

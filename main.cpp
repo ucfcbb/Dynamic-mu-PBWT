@@ -1,9 +1,9 @@
 #include <iostream>
 #include <getopt.h>
+#include <random>
+#include <assert.h>
 
 #include "dcpbwt.h"
-#include <random>
-
 #include "utils.h"
 
 void PrintHelp() {
@@ -54,7 +54,7 @@ void Test_TopDown_Delete(DCPBWT &dcpbwt) {
   int hap_id = 0;
   for (unsigned int i = 0; i < total; ++i) {
     dcpbwt.DeleteSingleHaplotype_v2(hap_id);
-    cout <<i << ". Deleted hap " << hap_id << "\n";
+    cout << i << ". Deleted hap " << hap_id << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
 }
@@ -308,7 +308,8 @@ int main(int argc, char **argv) {
   }
   std::string ref_vcf_input;
   std::string query_vcf_input;
-  std::string output;
+  std::string output_file;
+  unsigned int length = 0;
   bool verbose = false;
 
   int c = 0;
@@ -316,12 +317,14 @@ int main(int argc, char **argv) {
     static struct option long_options[] = {
       {"reference", required_argument, nullptr, 'i'},
       {"query", required_argument, nullptr, 'q'},
+      {"length", required_argument, nullptr, 'l'},
+      {"output", required_argument, nullptr, 'o'},
       {"verbose", no_argument, nullptr, 'v'},
       {"help", no_argument, nullptr, 'h'},
       {nullptr, 0, nullptr, 0}};
 
     int option_index = 0;
-    c = getopt_long(argc, argv, "i:q:vh", long_options,
+    c = getopt_long(argc, argv, "i:q:l:o:vh", long_options,
                     &option_index);
 
     if (c == -1) {
@@ -333,6 +336,10 @@ int main(int argc, char **argv) {
         break;
       case 'q':query_vcf_input = optarg;
         break;
+      case 'l':length = std::stoi(optarg);
+        break;
+      case 'o':output_file = optarg;
+        break;
       case 'v':verbose = true;
         break;
       case 'h':PrintHelp();
@@ -341,29 +348,51 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
   }
-  if (!filesystem::exists(ref_vcf_input)) {
-    cerr << "Specified ref vcf : " << ref_vcf_input << " doesn't exist!\n";
-    exit(EXIT_FAILURE);
-  }
-  if (!filesystem::exists(query_vcf_input)) {
-    cerr << "Specified query vcf : " << query_vcf_input << " doesn't exist!\n";
+
+  bool query = false;
+  if (ref_vcf_input.empty()) {
+    cerr << "Input ref vcf file is not provided! Must provide this file.\n";
     exit(EXIT_FAILURE);
   }
 
+  if (!query_vcf_input.empty()) {
+    query = true;
+  }
+
+  if (query && length > 0) {
+    if (output_file.empty()) {
+      cerr << "Output file to store matches missing! Please specify an output file.\n";
+      exit(EXIT_FAILURE);
+    }
+    if (!filesystem::exists(ref_vcf_input)) {
+      cerr << "Specified ref vcf : " << ref_vcf_input << " doesn't exist!\n";
+      exit(EXIT_FAILURE);
+    }
+    if (!filesystem::exists(query_vcf_input)) {
+      cerr << "Specified query vcf : " << query_vcf_input << " doesn't exist!\n";
+      exit(EXIT_FAILURE);
+    }
+    DCPBWT dcpbwt(ref_vcf_input, verbose);
+    dcpbwt.long_match_query(query_vcf_input, output_file, static_cast<unsigned int>(length), verbose, false);
+
+  } else {
 //  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
-  DCPBWT dcpbwt(ref_vcf_input, verbose);
+    DCPBWT dcpbwt(ref_vcf_input, verbose);
 //  Test_TopDown_Delete(dcpbwt);
-  Test_BottomUp_Delete(dcpbwt);
-  return 0;
-  dcpbwt.DeleteSingleHaplotype_v2(4);
+    Test_BottomUp_Delete(dcpbwt);
+  }
 
+  return 0;
+}
+
+/*
   // Test for phi supp and phi inv supp for hap_id = 4
   vector<vector<unsigned int>> expected_phi_supp = {{0, 18, 0, 0, 18, 17, 15, 0, 0, 0, 10, 15}, // 0
                                                     {0, 18, 4, 1, 17}, // 1
                                                     {1, 6}, // 2
                                                     {2}, // 3
                                                     {3, 4, 3, 17, 13, 7}, // 4
-                                                    {4, 3, 0,17, 18}, // 5
+                                                    {4, 3, 0, 17, 18}, // 5
                                                     {5}, // 6
                                                     {6, 7, 8}, // 7
                                                     {7, 8, 16, 13}, // 8
@@ -415,30 +444,30 @@ int main(int argc, char **argv) {
     {0, 0, 5, 11, 11, 15}, // 11
     {0, 5, 9, 11}, // 12
     {0}, // 13
-    {0, 5, 6,  7, 8, 9, 9, 9}, // 14
+    {0, 5, 6, 7, 8, 9, 9, 9}, // 14
     {0}, // 15
     {0, 0, 2}, // 16
     {0, 0, 1, 1, 1, 6, 6, 6}, // 17
     {0, 0, 0, 3, 3, 5, 12, 14, 15}, // 18
   };
-  cout << "############################\n";
-  cout << "# Test for Phi Supp  #######\n";
-  cout << "############################\n";
-  for(int i = 0; i < dcpbwt.M; ++i){
-    assert(dcpbwt.phi->phi_supp[i].size() == expected_phi_supp[i].size());
-    for(int j = 0; j < expected_phi_supp[i].size(); ++j){
+  //cout << "############################\n";
+  //cout << "# Test for Phi Supp  #######\n";
+  //cout << "############################\n";
+//  for (int i = 0; i < //dcpbwt.M; ++i) {
+   // assert(//dcpbwt.phi->phi_supp[i].size() == expected_phi_supp[i].size());
+  //  for (int j = 0; j < expected_phi_supp[i].size(); ++j) {
       assert(dcpbwt.phi->phi_supp[i].at(j) == expected_phi_supp[i][j]);
     }
-    cout << "Hap " << i << " passed!\n";
+ //   cout << "Hap " << i << " passed!\n";
   }
-  cout << "\n";
+  //cout << "\n";
 
-  cout << "############################\n";
+  //cout << "############################\n";
   cout << "# Test for Phi Supp LCP ####\n";
   cout << "############################\n";
-  for(int i = 0; i < dcpbwt.M; ++i){
+  for (int i = 0; i < dcpbwt.M; ++i) {
     assert(dcpbwt.phi->phi_supp_lcp[i].size() == expected_phi_supp_lcp[i].size());
-    for(int j = 0; j < expected_phi_supp_lcp[i].size(); ++j){
+    for (int j = 0; j < expected_phi_supp_lcp[i].size(); ++j) {
       assert(dcpbwt.phi->phi_supp_lcp[i].at(j) == expected_phi_supp_lcp[i][j]);
     }
     cout << "Hap " << i << " passed!\n";
@@ -448,9 +477,9 @@ int main(int argc, char **argv) {
   cout << "############################\n";
   cout << "# Test for Phi Inv Supp ####\n";
   cout << "############################\n";
-  for(int i = 0; i < dcpbwt.M; ++i){
+  for (int i = 0; i < dcpbwt.M; ++i) {
     assert(dcpbwt.phi->phi_supp[i].size() == expected_phi_supp[i].size());
-    for(int j = 0; j < expected_phi_supp[i].size(); ++j){
+    for (int j = 0; j < expected_phi_supp[i].size(); ++j) {
       assert(dcpbwt.phi->phi_supp[i].at(j) == expected_phi_supp[i][j]);
     }
     cout << "Hap " << i << " passed!\n";
@@ -458,19 +487,25 @@ int main(int argc, char **argv) {
   vector<vector<unsigned int>> expected_phi_inv_vec = {
     {false, false, false, false, true, true, false, false, true, false, false, false, false, false, false, false}, // 0
     {false, false, false, false, false, false, false, false, false, false, false, true, true, false, false, false}, // 1
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 2
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 2
     {true, true, true, false, true, true, false, true, true, false, false, true, false, false, true, false}, // 3
     {false, false, true, false, false, false, true, true, false, false, false, false, true, false, false, false}, // 4
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 5
-    {false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false}, // 6
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 5
+    {false, false, false, false, false, false, false, false, false, false, false, true, false, false, false,
+     false}, // 6
     {false, false, false, true, false, true, true, false, false, false, false, false, false, false, false, false}, // 7
     {false, false, false, true, false, false, false, false, false, true, true, true, true, false, false, false}, // 8
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 9
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 9
     {false, false, false, true, false, false, false, false, true, false, true, true, true, true, true, true}, // 10
     {false, false, false, false, false, false, false, false, true, false, true, false, false, false, true, true}, // 11
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 12
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 12
     {false, false, false, false, true, false, true, false, true, true, false, false, false, false, false, false}, // 13
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 14
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 14
     {false, false, false, true, false, true, false, false, true, false, false, false, true, false, false, false}, // 15
     {true, false, true, true, true, false, false, false, false, true, true, false, true, false, false, false}, // 16
     {true, true, true, false, true, true, false, false, false, false, false, false, true, true, false, false}, // 17
@@ -480,30 +515,37 @@ int main(int argc, char **argv) {
   vector<vector<unsigned int>> expected_phi_vec = {
     {true, true, true, true, true, true, false, false, true, true, true, true, true, false, false, false}, // 0
     {false, false, false, false, true, false, false, true, false, false, false, false, true, true, false, false}, // 1
-    {false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false}, // 2
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 3
+    {false, false, false, false, false, false, false, false, false, false, false, true, false, false, false,
+     false}, // 2
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 3
     {true, true, true, false, true, false, true, false, false, false, false, false, false, false, false, false}, // 4
     {false, false, true, false, true, true, false, false, false, false, false, false, true, false, false, false}, // 5
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 6
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 6
     {false, false, false, false, false, false, false, false, false, false, false, true, true, false, false, false}, // 7
     {false, false, false, true, true, false, false, false, false, true, false, false, false, false, false, false}, // 8
     {false, false, false, true, false, true, false, false, true, false, false, false, true, false, false, false}, // 9
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 10
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 10
     {false, false, false, true, false, false, false, false, false, true, true, true, false, false, true, true}, // 11
     {false, false, false, false, false, false, false, false, true, false, true, false, false, false, true, false}, // 12
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 13
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 13
     {false, false, false, false, true, true, true, true, true, false, false, true, true, false, false, false}, // 14
-    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}, // 15
-    {false, false, false, true, false, false, false, false, true, false, false, false, false, false, false, false}, // 16
+    {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+     false}, // 15
+    {false, false, false, true, false, false, false, false, true, false, false, false, false, false, false,
+     false}, // 16
     {true, true, true, true, false, true, false, true, false, false, false, false, true, false, false, false}, // 17
     {true, false, true, false, false, false, true, false, true, false, true, false, true, true, true, true}, // 18
   };
   cout << "############################\n";
   cout << "# Test for Phi Vec  #######\n";
   cout << "############################\n";
-  for(int i = 0; i < dcpbwt.M; ++i){
+  for (int i = 0; i < dcpbwt.M; ++i) {
     assert(dcpbwt.phi->phi_vec[i].size() == expected_phi_vec[i].size());
-    for(int j = 0; j < expected_phi_vec[i].size(); ++j){
+    for (int j = 0; j < expected_phi_vec[i].size(); ++j) {
       assert(dcpbwt.phi->phi_vec[i].at(j) == expected_phi_vec[i][j]);
     }
     cout << "Hap " << i << " passed!\n";
@@ -512,9 +554,9 @@ int main(int argc, char **argv) {
   cout << "############################\n";
   cout << "# Test for Phi Inv Vec  #######\n";
   cout << "############################\n";
-  for(int i = 0; i < dcpbwt.M; ++i){
+  for (int i = 0; i < dcpbwt.M; ++i) {
     assert(dcpbwt.phi->phi_inv_vec[i].size() == expected_phi_inv_vec[i].size());
-    for(int j = 0; j < expected_phi_inv_vec[i].size(); ++j){
+    for (int j = 0; j < expected_phi_inv_vec[i].size(); ++j) {
       assert(dcpbwt.phi->phi_inv_vec[i].at(j) == expected_phi_inv_vec[i][j]);
     }
     cout << "Hap " << i << " passed!\n";
@@ -544,9 +586,9 @@ int main(int argc, char **argv) {
     {18, 11, 12}, // 14
     {11, 18}, // 15
   };
-  for(int i = 0; i <= dcpbwt.N; ++i){
+  for (int i = 0; i <= dcpbwt.N; ++i) {
     assert(dcpbwt.columns[i].pref_samples_beg.size() == expected_pref_beg[i].size());
-    for(int j = 0; j < expected_pref_beg[i].size(); ++j){
+    for (int j = 0; j < expected_pref_beg[i].size(); ++j) {
       assert(dcpbwt.columns[i].pref_samples_beg.at(j) == expected_pref_beg[i][j]);
     }
     cout << "Site " << i << " passed!\n";
@@ -574,9 +616,9 @@ int main(int argc, char **argv) {
     {3, 11, 10}, // 14
     {11, 10}, // 15
   };
-  for(int i = 0; i <= dcpbwt.N; ++i){
+  for (int i = 0; i <= dcpbwt.N; ++i) {
     assert(dcpbwt.columns[i].pref_samples_end.size() == expected_pref_end[i].size());
-    for(int j = 0; j < expected_pref_end[i].size(); ++j){
+    for (int j = 0; j < expected_pref_end[i].size(); ++j) {
       assert(dcpbwt.columns[i].pref_samples_end.at(j) == expected_pref_end[i][j]);
     }
     cout << "Site " << i << " passed!\n";
@@ -604,9 +646,9 @@ int main(int argc, char **argv) {
     {14, 11, 9}, // 14
     {15, 15}, // 15
   };
-  for(int i = 0; i <= dcpbwt.N; ++i){
+  for (int i = 0; i <= dcpbwt.N; ++i) {
     assert(dcpbwt.columns[i].div_samples_beg.size() == expected_div_sample[i].size());
-    for(int j = 0; j < expected_div_sample[i].size(); ++j){
+    for (int j = 0; j < expected_div_sample[i].size(); ++j) {
       assert(dcpbwt.columns[i].div_samples_beg.at(j) == expected_div_sample[i][j]);
     }
     cout << "Site " << i << " passed!\n";
@@ -614,4 +656,4 @@ int main(int argc, char **argv) {
   cout << "\n";
 //  Test_10Insertions(dcpbwt);
   return (EXIT_SUCCESS);
-}
+//}*/

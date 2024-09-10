@@ -10,16 +10,10 @@
 #include "dynamic/dynamic.hpp"
 #include "phi.h"
 #include "dcpbwt_column.h"
-#include <deque>
-
 #include "utils.h"
 
 using namespace dyn;
 using namespace std;
-
-//typedef spsi<packed_vector, 256, 2> my_spsi;
-
-
 
 class DCPBWT {
  public:
@@ -31,7 +25,7 @@ class DCPBWT {
 
   // constructor
   DCPBWT(std::string ref_vcf_file, bool verbose) {
-    // std::vector<std::vector<bool>> alleles;
+    // TODO: Use htslib
     // extract alleles from VCF
     auto retval = ReadVCF(ref_vcf_file);
     this->M = retval.first;
@@ -39,16 +33,17 @@ class DCPBWT {
     for (unsigned int i = 0; i < M; ++i) {
       haplotype_ids.insert(i);
     }
-//    cout << haplotype_ids.size() << "\n";
-
-    // build the ref panel
-    // Build(alleles);
     BuildFromVCF(ref_vcf_file, verbose);
   }
   ~DCPBWT() {
     delete phi;
   }
 
+
+  // Helper Methods
+  /*
+   * Returns the index of run that the haplotype index i belongs to.
+   */
   [[nodiscard]] unsigned int get_run_idx(const unsigned int col, const unsigned int i) const {
     if (i >= (this->M - 1)) {
       return columns[col].combined.size() - 1;
@@ -56,7 +51,9 @@ class DCPBWT {
     return columns[col].combined.search(i + 1);
   }
 
-  // returns the head of a run
+  /*
+   * Returns the index of the head of a run specified by run_idx
+   */
   [[nodiscard]] unsigned int get_run_head(const unsigned int col, const unsigned int run_idx) const {
     if (run_idx >= columns[col].combined.size()) {
       cerr << "Out of bounds: Accessing run that doesn't exist!\n";
@@ -68,8 +65,10 @@ class DCPBWT {
     return columns[col].combined.psum(run_idx - 1);
   }
 
+  /*
+   * Returns the allele value of the run specified by run_idx
+   */
   [[nodiscard]] bool get_run_val(const unsigned int col, const unsigned int run_idx) const {
-//    if (run_idx % 2 == 0) {
     if (!(run_idx & 1)) {
       if (columns[col].start_with_zero) {
         return false;
@@ -82,10 +81,22 @@ class DCPBWT {
     return false;
   }
 
-  std::pair<unsigned int, unsigned int> column_end_lf(unsigned int col, bool val) {
+  [[nodiscard]] bool isRunEnd(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id) const {
+    return hap_id == this->columns[col].pref_samples_end.at(run_idx);
+  }
+
+  [[nodiscard]] bool isRunStart(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id) const {
+    return hap_id == this->columns[col].pref_samples_beg.at(run_idx);
+  }
+
+  [[nodiscard]] bool isRunWithSingleElement(const unsigned int col, const unsigned int run_idx) const {
+    return columns[col].combined.at(run_idx) == 1;
+  }
+
+  [[nodiscard]] std::pair<unsigned int, unsigned int> column_end_lf(unsigned int col, bool val) const {
     if (val) { return {this->M, UINT_MAX}; } // last row, invalid hapID
     // Only zeros no ones in a column
-    if (val == false && columns[col].ones.size() == 0) { return {this->M, UINT_MAX}; } // last row, invalid hapID
+    if (!val && columns[col].ones.size() == 0) { return {this->M, UINT_MAX}; } // last row, invalid hapID
     unsigned int ind = columns[col].num_zeros;
     unsigned int ridx = 0; // assume column starts with a run of ones
     if (columns[col].start_with_zero) { // the second run at index 1 will be run of ones
@@ -94,7 +105,10 @@ class DCPBWT {
     return {ind, columns[col].pref_samples_beg.at(ridx)};
   }
 
-  std::pair<int, int> w_mod(const unsigned int i, const unsigned int col, const bool val, const unsigned int pref_val) {
+  std::pair<unsigned int, unsigned int> w_mod(const unsigned int i,
+                                              const unsigned int col,
+                                              const bool val,
+                                              const unsigned int pref_val) {
     if (i == this->M) { return column_end_lf(col, val); }
     const unsigned int run_idx = get_run_idx(col, i);
 
@@ -805,19 +819,6 @@ class DCPBWT {
     ++this->phi->total_haplotypes;
   }
 
-  bool isRunWithSingleElement(const unsigned int col, const unsigned int run_idx) {
-    return columns[col].combined.at(run_idx) == 1;
-  }
-
-  // helper methods
-  [[nodiscard]] bool isRunEnd(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id) const {
-    return hap_id == this->columns[col].pref_samples_end.at(run_idx);
-  }
-
-  [[nodiscard]] bool isRunStart(const unsigned int col, const unsigned int run_idx, const unsigned int hap_id) const {
-    return hap_id == this->columns[col].pref_samples_beg.at(run_idx);
-  }
-
   /*
    * Delete run with a single value remaining. The adjacent runs (if exist) will be merged in this case.
    */
@@ -1492,6 +1493,251 @@ class DCPBWT {
     --this->phi->total_haplotypes;
   }
 
+  std::vector<std::tuple<int, int, int>> compute_ms_long(vector<bool> &query,
+                                                         const unsigned int length,
+                                                         bool verbose = false) {
+    // compute the match iff |query| is equal to the width of the panel
+    if (query.size() != this->N) {
+      std::cout << query.size() << " != " << this->N
+                << "\n";
+      exit(1);
+    }
+
+    // initialize matching statistics
+    std::vector<std::pair<unsigned int, unsigned int>> virtual_insert_indices(this->N + 1);
+    std::vector<unsigned int> zstart(this->N + 1);
+    std::vector<unsigned int> bstart(this->N + 1);
+
+    // update sequence below query in each column in
+    // the modified matching statistic
+    virtual_insert_indices[0].first = this->M; // stores haplotype index
+    virtual_insert_indices[0].second = UINT_MAX; // stores haplotype ID
+    for (unsigned int k = 0; k < this->N; ++k) {
+      virtual_insert_indices[k + 1] =
+        w_mod(virtual_insert_indices[k].first, k, query[k], virtual_insert_indices[k].second);
+    }
+
+    // update divergence values
+    CalculateDivergenceVal(virtual_insert_indices, query, zstart, bstart);
+
+    // query algorithm
+    std::pair<unsigned int, unsigned int> f_curr_pair = virtual_insert_indices[0];
+    std::pair<unsigned int, unsigned int> g_curr_pair = virtual_insert_indices[0];
+    std::vector<unsigned int> dZ(this->M, 0);
+
+    // stores the matches found
+    std::vector<std::tuple<int, int, int>> ms_matches;
+    for (unsigned int k = 0; k < this->N; ++k) {
+      bool query_opposite = !(query[k]);
+      auto f_opp_pair = w_mod(f_curr_pair.first, k, query_opposite, f_curr_pair.second);
+      auto g_opp_pair = w_mod(g_curr_pair.first, k, query_opposite, g_curr_pair.second);
+
+      auto f_prime_pair = w_mod(f_curr_pair.first, k, query[k], f_curr_pair.second);
+      auto g_prime_pair = w_mod(g_curr_pair.first, k, query[k], g_curr_pair.second);
+
+      while (f_opp_pair.first != g_opp_pair.first) { // comparing haplotype ID
+        // store matches
+        ms_matches.emplace_back(f_opp_pair.second, dZ[f_opp_pair.second], k);
+
+        // equivalent to : f_temp  = f_temp.below
+        auto new_f_temp_hapid = this->phi->phi_inv(f_opp_pair.second, k + 1);
+        f_opp_pair.first++;
+        if (new_f_temp_hapid.has_value()) {
+          f_opp_pair.second = new_f_temp_hapid.value();
+        } else {
+          assert(f_opp_pair.first == g_opp_pair.first);
+//                    if (verbose)
+//                        std::cout << "Report matches: Bottom boundary reached \n";
+          break;
+        }
+      }
+
+      // if empty block
+      assert((f_prime_pair.first == g_prime_pair.first) == (f_prime_pair.second == g_prime_pair.second));
+      if (f_prime_pair.first == g_prime_pair.first) {
+        if (k + 1 - zstart[k + 1] == length) {
+          assert(f_prime_pair.first > 0);
+          auto above_val = this->phi->phi(f_prime_pair.second, k + 1);
+          if (above_val.has_value()) {
+            f_prime_pair.second = above_val.value();
+            assert(f_prime_pair.first > 0);
+            f_prime_pair.first = std::max((int) f_prime_pair.first - 1, 0);
+          } else {
+            std::cout << "Error in finding phi for hapID : " << f_prime_pair.second << " in column " << k << "\n";
+            exit(EXIT_FAILURE);
+          }
+          dZ[f_prime_pair.second] = k + 1 - length;
+        }
+
+        if (k + 1 - bstart[k + 1] == length) {
+          dZ[g_prime_pair.second] = k + 1 - length;
+          auto below_val = this->phi->phi_inv(g_prime_pair.second, k + 1);
+          if (below_val.has_value()) {
+            g_prime_pair.second = below_val.value();
+            assert(g_prime_pair.first < this->M);
+            g_prime_pair.first = std::max((int) g_prime_pair.first + 1, 0);
+          } else {
+            std::cout << "Error in finding phi for hapID : " << g_prime_pair.second << " in column " << k << "\n";
+            exit(EXIT_FAILURE);
+          }
+        }
+      }
+
+      // expand boundaries of the block
+      if (f_prime_pair.first != g_prime_pair.first) {
+        while (this->phi->plcp(f_prime_pair.second, k + 1) <= k + 1 - length) {
+          auto above_val = this->phi->phi(f_prime_pair.second, k + 1);
+          if (above_val.has_value()) {
+            f_prime_pair.second = above_val.value();
+            f_prime_pair.first = std::max((int) f_prime_pair.first - 1, 0);
+          } else {
+            std::cout << "Error in finding phi for hapID : " << f_prime_pair.second << " in column " << k << "\n";
+            exit(EXIT_FAILURE);
+            if (verbose)
+              std::cout << "Expand boundary: Top boundary reached \n";
+            break;
+          }
+          dZ[f_prime_pair.second] = k + 1 - length;
+        }
+        while (this->phi->plcp(g_prime_pair.second, k + 1) <= k + 1 - length) {
+          dZ[g_prime_pair.second] = k + 1 - length;
+          auto below_val = this->phi->phi_inv(g_prime_pair.second, k + 1);
+          if (below_val.has_value()) {
+            g_prime_pair.second = below_val.value();
+            assert(g_prime_pair.first < this->M);
+            g_prime_pair.first = std::min((int) g_prime_pair.first + 1, (int) this->M);
+          } else {
+            if (verbose)
+              std::cout << "Expand boundary: Bottom Boundary reached: \n";
+            g_prime_pair.second = -1;
+            g_prime_pair.first = (int) this->M;
+            break;
+          }
+        }
+      }
+      f_curr_pair = f_prime_pair;
+      g_curr_pair = g_prime_pair;
+    }
+    while (f_curr_pair.first != g_curr_pair.first) {
+      // store matches
+      ms_matches.emplace_back(f_curr_pair.second, dZ[f_curr_pair.second], this->N);
+
+      // equivalent to : f_temp  = f_temp.below
+      auto new_f_temp_hapid = this->phi->phi_inv(f_curr_pair.second, this->N);
+      f_curr_pair.first++;
+      if (new_f_temp_hapid.has_value()) {
+        f_curr_pair.second = new_f_temp_hapid.value();
+      } else {
+        assert(f_curr_pair.first == this->M && f_curr_pair.first == g_curr_pair.first);
+        if (verbose)
+          std::cout << "Report matches: Bottom boundary reached \n";
+        break;
+      }
+    }
+    return ms_matches;
+  }
+
+  void long_match_query(string &query_vcf, string &out, unsigned int length = 0,
+                        bool verbose = false, bool load_panel = false) {
+    std::ofstream out_match(out);
+    /*
+    std::vector<std::string> queries_panel;
+    htsFile *fp = hts_open(filename, "rb");
+    std::cout << "Reading VCF file...\n";
+    bcf_hdr_t *hdr = bcf_hdr_read(fp);
+    bcf1_t *rec = bcf_init();
+    std::string new_column;
+    while (bcf_read(fp, hdr, rec) >= 0) {
+      new_column = "";
+      bcf_unpack(rec, BCF_UN_ALL);
+      // read SAMPLE
+      int32_t *gt_arr = NULL, ngt_arr = 0;
+      int i, j, ngt, nsmpl = bcf_hdr_nsamples(hdr);
+      ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+      int max_ploidy = ngt / nsmpl;
+      for (i = 0; i < nsmpl; i++) {
+        int32_t *ptr = gt_arr + i * max_ploidy;
+        for (j = 0; j < max_ploidy; j++) {
+          // if true, the sample has smaller ploidy
+          if (ptr[j] == bcf_int32_vector_end) break;
+
+          // missing allele
+          if (bcf_gt_is_missing(ptr[j])) exit(-1);
+
+          // the VCF 0-based allele index
+          int allele_index = bcf_gt_allele(ptr[j]);
+          new_column += std::to_string(allele_index);
+        }
+      }
+      free(gt_arr);
+      queries_panel.push_back(new_column);
+    }
+    bcf_hdr_destroy(hdr);
+    hts_close(fp);
+    bcf_destroy(rec);
+    std::string query;
+    std::vector<std::string> queries;
+    if (out_match.is_open()) {
+      for (unsigned int i = 0; i < queries_panel[0].size(); i++) {
+        if (verbose) {
+          std::cout << i << ": \n";
+        }
+        for (auto &j : queries_panel) {
+          query.push_back(j[i]);
+        }
+        queries.push_back(query);
+        query.clear();
+      }
+
+     */
+    vector<vector<bool>> queries;
+    ReadQueryVCF(query_vcf, queries);
+    auto n_queries = queries.size();
+    std::vector<std::vector<std::tuple<int, int, int>>> matches_vec(n_queries);
+    if (load_panel) {
+//#pragma omp parallel for default(none) \
+//                        shared(queries, matches_vec, n_queries, length, verbose, std::cout)
+      for (unsigned int i = 0; i < n_queries; i++) {
+        //matches_vec[i] = this->compute_ms_long_bitpanel(queries[i], length, verbose);
+      }
+    } else {
+//#pragma omp parallel for default(none) \
+//                        shared(queries, matches_vec, n_queries, length, verbose, std::cout)
+      for (unsigned int i = 0; i < n_queries; i++) {
+        matches_vec[i] = this->compute_ms_long(queries[i], length, verbose);
+        cout << "Completed query " << i << "\n";
+      }
+    }
+
+    // find long match query and report
+    // un-parallelized version
+//                for(unsigned int i = 0; i < n_queries; i++){
+//                    matches_vec[i] = this->compute_ms_long(queries[i], length, verbose);
+//                }
+
+    // report long matches
+    std::cout << "Outputting matches...\n";
+    out_match << "MATCH\tQueryHapID\tRefHapID\tStart\tEnd(exclusive)\tLength\n";
+    for (unsigned int i = 0; i < queries.size(); i++) {
+      for (unsigned int j = 0;
+           j < matches_vec[i].size(); j++) {
+        auto ref_hap_ID =
+          std::get<0>(
+            matches_vec[i][j]);
+        auto start_pos =
+          std::get<1>(
+            matches_vec[i][j]);
+        auto end =
+          std::get<2>(
+            matches_vec[i][j]);
+        out_match << "MATCH\t" << i << "\t" << ref_hap_ID << "\t"
+                  << start_pos << "\t" << end << "\t"
+                  << end - start_pos << "\n";
+      }
+    }
+    out_match.close();
+  }
+
   // Build the reference panel
   void BuildFromVCF(std::string &filename, bool verbose) {
     std::string line = "##";
@@ -1516,7 +1762,7 @@ class DCPBWT {
       vector<unsigned int> u, v;
       vector<unsigned int> freq;
       unsigned int total_runs = 0;
-      int col = 0;
+      unsigned int col = 0;
       int cnt = 1;
       bool prev_allele = false;
       // TODO: Possible optimization using sdsl int vec
@@ -1763,119 +2009,4 @@ class DCPBWT {
     }
 
   }
-
-  /*
-  void Build(std::vector<std::vector<bool>> &alleles) {
-
-    vector<int> u, v;
-    vector<int> freq;
-    int total_runs = 0;
-    int col = 0;
-    int cnt = 1;
-    bool prev_allele = false;
-    vector<int> prefix_arr(M, 0);
-    std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
-
-    vector<vector<unsigned int>> sites_where_sample_beg(M);
-    vector<vector<unsigned int>> sites_where_sample_end(M);
-
-    while (col < N) {
-      packed_spsi temp_zeros;
-      packed_spsi temp_ones;
-      packed_spsi temp_combined;
-//      packed_spsi temp_sample_beg;
-//      packed_spsi temp_sample_end;
-      succinct_spsi temp_sample_beg;
-      succinct_spsi temp_sample_end;
-      bool start_with_zero = false;
-
-      for (int i = 0; i < M; ++i) {
-        // first allele
-        if (i == 0) {
-          if (alleles[col][prefix_arr[i]]) { // allele: 1
-            v.push_back(prefix_arr[i]);
-          } else { // allele: 0
-            u.push_back(prefix_arr[i]);
-            start_with_zero = true;
-          }
-          temp_sample_beg.push_back(prefix_arr[i]);
-          prev_allele = alleles[col][prefix_arr[i]];
-          cnt = 1;
-          continue;
-        }
-
-        if (alleles[col][prefix_arr[i]] != prev_allele) {
-          freq.push_back(cnt);
-          prev_allele = alleles[col][prefix_arr[i]];
-          cnt = 1;
-          temp_sample_beg.push_back(prefix_arr[i]);
-          temp_sample_end.push_back(prefix_arr[i - 1]);
-        } else {
-          ++cnt;
-        }
-
-        if (alleles[col][prefix_arr[i]]) {
-          v.push_back(prefix_arr[i]);
-        } else {
-          u.push_back(prefix_arr[i]);
-        }
-      }
-      temp_sample_end.push_back(prefix_arr[M - 1]);
-
-      // edge case
-      if (cnt > 0)
-        freq.push_back(cnt);
-
-      // populate dynamic data structures
-      for (int i = 0; i < freq.size(); ++i) {
-        temp_combined.push_back(freq[i]);
-        if (start_with_zero) {
-          if (i % 2 == 0) {
-            temp_zeros.push_back(freq[i]);
-          } else {
-            temp_ones.push_back(freq[i]);
-          }
-        } else {
-          if (i % 2 == 0) {
-            temp_ones.push_back(freq[i]);
-          } else {
-            temp_zeros.push_back(freq[i]);
-          }
-        }
-      }
-
-      assert(temp_combined.size() == temp_sample_beg.size());
-      assert(temp_combined.size() == temp_sample_end.size());
-
-      for (auto i = 0; i < temp_sample_beg.size(); ++i) {
-        sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
-        sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
-      }
-
-      // build each column
-      dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
-                         (std::move(temp_sample_beg)), (std::move(temp_sample_end)),
-                         start_with_zero, u.size());
-      columns.emplace_back(coln);
-
-      total_runs += freq.size();
-      // next col prefix arr
-      prefix_arr.clear();
-      prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
-      prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
-      ++col;
-      u.clear();
-      v.clear();
-      freq.clear();
-    } // run-through all sites
-
-    assert(columns.size() == N);
-    // build phi data-structure
-    this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, false);
-    assert(col == N);
-    total_runs += freq.size();
-    cout << "Phi support size (in bits) = " << this->phi->size_in_bytes(false) << "\n";
-    cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
-  }
-   */
 };

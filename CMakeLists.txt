@@ -10,7 +10,8 @@ add_compile_options(-Wall -Wextra -pedantic -O0)
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
 add_executable(${PROJECT_NAME} main.cpp include/dcpbwt.h
         include/phi.h
-        include/dcpbwt_column.h)
+        include/dcpbwt_column.h
+)
 
 # ---- Download submodules ---- #
 find_package(Git QUIET)
