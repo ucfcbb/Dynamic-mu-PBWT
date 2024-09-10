@@ -1,7 +1,6 @@
 #include <iostream>
 #include <getopt.h>
 #include <random>
-#include <assert.h>
 
 #include "dcpbwt.h"
 #include "utils.h"
@@ -14,28 +13,6 @@ void PrintHelp() {
   std::cout << "  -l, --input length <int>\t of match" << std::endl;
   std::cout << "  -v, --verbose <path>\t show detail information" << std::endl;
   std::cout << "  -h, --help\t show this help message and exit" << std::endl;
-}
-
-void Test_UV(DCPBWT &dcpbwt) {
-  unsigned int query_idx = 0;
-  auto uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 5;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 6;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 10;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 17;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
 }
 
 void Test_BottomUp_Delete(DCPBWT &dcpbwt) {
@@ -300,6 +277,7 @@ void Test_Reverself(DCPBWT &dcpbwt) {
   cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
        << "\n";
 }
+
 
 int main(int argc, char **argv) {
   if (argc == 1) {

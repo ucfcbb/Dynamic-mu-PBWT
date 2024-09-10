@@ -1267,8 +1267,6 @@ class DCPBWT {
       return;
     }
 
-    this->printHap(0);
-
     // If deletion from the bottom
     if (hap_id == this->M - 1) {
       DeleteBottomHaplotype(hap_id);
@@ -1278,7 +1276,6 @@ class DCPBWT {
       vector<bool> last_hap_alleles;
       last_hap_info[0].first = this->M - 1;
       last_hap_info[0].second = this->M - 1;
-      this->printHap(this->M - 1);
       for (unsigned int col = 0; col < this->N; ++col) {
         unsigned int run_idx = get_run_idx(col, last_hap_info[col].first);
         const bool allele = this->get_run_val(col, run_idx);
@@ -1314,7 +1311,6 @@ class DCPBWT {
       for (unsigned int i = 0; i <= this->N; ++i) {
         assert(static_cast<bool>(this->phi->phi_vec[hap_id].at(i)) == false);
         assert(static_cast<bool>(this->phi->phi_inv_vec[hap_id].at(i)) == false);
-        cout << i << ". col passed assert!\n";
       }
       assert(this->phi->phi_supp[hap_id].size() == 1);
       assert(this->phi->phi_inv_supp[hap_id].size() == 1);
@@ -1780,7 +1776,6 @@ class DCPBWT {
       while (getline(inFile, line)) {
         std::istringstream iss(line);
         token = "";
-
         single_col.clear();
         for (int i = 0; i < (this->M / 2) + 9; ++i) {
           iss >> token;
@@ -2007,6 +2002,5 @@ class DCPBWT {
       std::cerr << "Couldn't find : " << filename << "\n";
       exit(1);
     }
-
   }
 };
