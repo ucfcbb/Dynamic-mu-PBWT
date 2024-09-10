@@ -1,9 +1,8 @@
 #include <iostream>
 #include <getopt.h>
-
-#include "dcpbwt.h"
 #include <random>
 
+#include "dcpbwt.h"
 #include "utils.h"
 
 void PrintHelp() {
@@ -14,28 +13,6 @@ void PrintHelp() {
   std::cout << "  -l, --input length <int>\t of match" << std::endl;
   std::cout << "  -v, --verbose <path>\t show detail information" << std::endl;
   std::cout << "  -h, --help\t show this help message and exit" << std::endl;
-}
-
-void Test_UV(DCPBWT &dcpbwt) {
-  unsigned int query_idx = 0;
-  auto uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 5;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 6;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 10;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
-
-  query_idx = 17;
-  uv = dcpbwt.uv_trick(0, query_idx);
-  cout << "For i = " << query_idx << ": u = " << uv.first << ", v = " << uv.second << "\n";
 }
 
 void Test_BottomUp_Delete(DCPBWT &dcpbwt) {
@@ -290,16 +267,21 @@ void Test_10Insertions(DCPBWT &dcpbwt) {
   }
 }
 
-void Test_Reverself(DCPBWT &dcpbwt) {
-  unsigned int col = 0;
-  unsigned int idx = 5;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
-  col = 12;
-  idx = 17;
-  cout << "Col " << col << ", idx " << idx << " -> " << " Col " << col - 1 << ", idx " << dcpbwt.reverse_lf(col, idx)
-       << "\n";
+void Test_random_delete(DCPBWT& dcpbwt){
+  std::random_device dev;
+  std::mt19937 rng(dev());
+
+  int cnt  = 1;
+  while(dcpbwt.M > 0){
+    std::uniform_int_distribution<std::mt19937::result_type> dist6(0,dcpbwt.M - 1); // distribution in range [1, 6]
+    unsigned int target_hap_id = dist6(rng);
+    dcpbwt.DeleteSingleHaplotype_v2(target_hap_id);
+    std::cout << cnt << ". Deleted " << target_hap_id << "\n";
+    ++cnt;
+  }
+  dcpbwt.DeleteSingleHaplotype_v2(0);
 }
+
 
 int main(int argc, char **argv) {
   if (argc == 1) {
@@ -353,7 +335,9 @@ int main(int argc, char **argv) {
 //  Test_Insertion(ref_vcf_input, query_vcf_input, verbose);
   DCPBWT dcpbwt(ref_vcf_input, verbose);
 //  Test_TopDown_Delete(dcpbwt);
-  Test_BottomUp_Delete(dcpbwt);
+//  Test_BottomUp_Delete(dcpbwt);
+  Test_random_delete(dcpbwt);
+
   return 0;
   dcpbwt.DeleteSingleHaplotype_v2(4);
 
