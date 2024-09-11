@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
-
 project(dcpbwt)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_compile_options(-Wall -Wextra -pedantic -O0)
+find_package(OpenMP)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("Using ${CMAKE_BUILD_TYPE} mode ")
+    add_compile_options(-Wall -Wextra -pedantic -O0)
+    set(EXE_NAME dcpbwt_debug)
+else()
+    message("Using ${CMAKE_BUILD_TYPE} mode ")
+    add_compile_options(-Wall -Wextra -O3 -march=native -fopenmp -ffast-math ${OpenMP_CXX_FLAGS})
+endif()
 
 include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
 add_executable(${PROJECT_NAME} main.cpp include/dcpbwt.h
