@@ -494,7 +494,7 @@ class DCPBWT {
       alleles.push_back(val);
     }
     assert(alleles.size() == this->N);
-    for (int i = 0; i < this->N; ++i) {
+    for (unsigned int i = 0; i < this->N; ++i) {
       cout << alleles[i] << " ";
     }
     cout << "\n";
@@ -933,7 +933,6 @@ class DCPBWT {
     unsigned int hap_after = this->columns[col].pref_samples_beg[run_idx + 1];
     unsigned int hap_id_div_val = this->columns[col].div_samples_beg.at(run_idx);
     unsigned int hap_after_div_val = this->columns[col].div_samples_beg.at(run_idx + 1);
-    unsigned int new_div_val = max(hap_id_div_val, hap_after_div_val);
 
     /* 0 0 0 0 0 0 0  |  1   | 0 0 0 0 0 0
      *    ridx-1      | ridx | ridx + 1
@@ -1225,7 +1224,7 @@ class DCPBWT {
       this->phi->phi_vec[hap_id].remove(0);
       this->phi->phi_inv_vec[hap_id].remove(0);
     }
-    for (int i = 0; i <= this->N; ++i) {
+    for (unsigned int i = 0; i <= this->N; ++i) {
       columns.pop_back();
     }
     assert(columns.size() == 0);
@@ -1690,6 +1689,7 @@ class DCPBWT {
     ReadQueryVCF(query_vcf, queries);
     auto n_queries = queries.size();
     std::vector<std::vector<std::tuple<int, int, int>>> matches_vec(n_queries);
+    clock_t START = clock();
     if (load_panel) {
 //#pragma omp parallel for default(none) \
 //                        shared(queries, matches_vec, n_queries, length, verbose, std::cout)
@@ -1697,13 +1697,15 @@ class DCPBWT {
         //matches_vec[i] = this->compute_ms_long_bitpanel(queries[i], length, verbose);
       }
     } else {
-//#pragma omp parallel for default(none) \
-//                        shared(queries, matches_vec, n_queries, length, verbose, std::cout)
+#pragma omp parallel for default(none) \
+                        shared(queries, matches_vec, n_queries, length, verbose, std::cout)
       for (unsigned int i = 0; i < n_queries; i++) {
         matches_vec[i] = this->compute_ms_long(queries[i], length, verbose);
-        cout << "Completed query " << i << "\n";
+        //cout << "Completed query " << i << "\n";
       }
     }
+    auto query_time = (float)(clock() - START)/CLOCKS_PER_SEC;
+    std::cout << "Time to query = " << query_time << " s.\n";
 
     // find long match query and report
     // un-parallelized version
@@ -1712,6 +1714,7 @@ class DCPBWT {
 //                }
 
     // report long matches
+    START = clock();
     std::cout << "Outputting matches...\n";
     out_match << "MATCH\tQueryHapID\tRefHapID\tStart\tEnd(exclusive)\tLength\n";
     for (unsigned int i = 0; i < queries.size(); i++) {
@@ -1731,6 +1734,8 @@ class DCPBWT {
                   << end - start_pos << "\n";
       }
     }
+    auto time_write_matches = (float)(clock() - START)/CLOCKS_PER_SEC;
+    std::cout << "Time to output matches = " << time_write_matches << " s.\n";
     out_match.close();
   }
 
@@ -1777,7 +1782,7 @@ class DCPBWT {
         std::istringstream iss(line);
         token = "";
         single_col.clear();
-        for (int i = 0; i < (this->M / 2) + 9; ++i) {
+        for (unsigned int i = 0; i < (this->M / 2) + 9; ++i) {
           iss >> token;
           if (i < 9) {
             continue;
@@ -1796,7 +1801,7 @@ class DCPBWT {
         assert(single_col.size() == this->M);
         p = col + 1;
         q = col + 1;
-        for (int i = 0; i < this->M; ++i) {
+        for (unsigned int i = 0; i < this->M; ++i) {
           // first allele
           if (i == 0) {
             if (single_col[prefix_arr[i]]) { // allele: 1
@@ -1853,7 +1858,7 @@ class DCPBWT {
           freq.push_back(cnt);
 
         // populate dynamic data structures
-        for (int i = 0; i < freq.size(); ++i) {
+        for (unsigned int i = 0; i < freq.size(); ++i) {
           temp_combined.push_back(freq[i]);
           if (start_with_zero) {
             if (i % 2 == 0) {
@@ -1874,7 +1879,7 @@ class DCPBWT {
         assert(temp_combined.size() == temp_sample_end.size());
         assert(temp_div.size() == temp_combined.size());
 
-        for (auto i = 0; i < temp_sample_beg.size(); ++i) {
+        for (unsigned int i = 0; i < temp_sample_beg.size(); ++i) {
           sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
           sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
         }
@@ -1913,7 +1918,7 @@ class DCPBWT {
       assert(single_col.size() == this->M);
       p = col + 1;
       q = col + 1;
-      for (int i = 0; i < this->M; ++i) {
+      for (unsigned int i = 0; i < this->M; ++i) {
         // first allele
         if (i == 0) {
           if (single_col[prefix_arr[i]]) { // allele: 1
@@ -1960,7 +1965,7 @@ class DCPBWT {
         freq.push_back(cnt);
 
       // populate dynamic data structures
-      for (int i = 0; i < freq.size(); ++i) {
+      for (unsigned int i = 0; i < freq.size(); ++i) {
         temp_combined.push_back(freq[i]);
         if (start_with_zero) {
           if (i % 2 == 0) {
@@ -1979,7 +1984,7 @@ class DCPBWT {
       assert(temp_combined.size() == temp_sample_beg.size());
       assert(temp_combined.size() == temp_sample_end.size());
       assert(temp_div.size() == temp_combined.size());
-      for (auto i = 0; i < temp_sample_beg.size(); ++i) {
+      for (unsigned int i = 0; i < temp_sample_beg.size(); ++i) {
         sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
         sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
       }

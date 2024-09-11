@@ -3,13 +3,11 @@ project(dcpbwt)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-set(EXE_NAME dcpbwt_release)
 find_package(OpenMP)
-
+set(EXE_NAME dcpbwt)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Using ${CMAKE_BUILD_TYPE} mode ")
   add_compile_options(-Wall -Wextra -pedantic -O0)
-  set(EXE_NAME dcpbwt_debug)
 else()
   message("Using ${CMAKE_BUILD_TYPE} mode ")
   add_compile_options(-Wall -Wextra -O3 -march=native -fopenmp -ffast-math ${OpenMP_CXX_FLAGS})
@@ -110,6 +108,7 @@ target_include_directories(test_delete PUBLIC external/DYNAMIC/include PUBLIC in
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
 
+target_link_libraries(${EXE_NAME} ${OpenMP_CXX_LIBRARIES})
 add_dependencies(${EXE_NAME} hopscotch_map)
 add_dependencies(test_insert hopscotch_map)
 add_dependencies(test_delete hopscotch_map)

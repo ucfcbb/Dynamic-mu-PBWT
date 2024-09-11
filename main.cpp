@@ -30,7 +30,7 @@ void Test_TopDown_Delete(DCPBWT &dcpbwt) {
     cout << "Testing Deletion TopDown i.e. from first haplotype to last haplotype in order...\n";
     int total = dcpbwt.M;
     int hap_id = 0;
-    for (unsigned int i = 0; i < total; ++i) {
+    for (int i = 0; i < total; ++i) {
         dcpbwt.DeleteSingleHaplotype_v2(hap_id);
         cout << i << ". Deleted hap " << hap_id << "\n";
     }

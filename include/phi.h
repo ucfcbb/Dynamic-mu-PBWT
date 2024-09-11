@@ -79,7 +79,7 @@ class phi_ds {
     for (unsigned int hap = 0; hap < total_haplotypes; hap++) {
       suc_bv tmp_begin, tmp_end;
       // initialize both suc_bv's with 0s (i.e. false)
-      for (int i = 0; i < total_sites + 1; ++i) {
+      for (unsigned int i = 0; i < total_sites + 1; ++i) {
         tmp_begin.push_back(false);
         tmp_end.push_back(false);
       }
