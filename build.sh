@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd build
-make
+make VERBOSE=1
