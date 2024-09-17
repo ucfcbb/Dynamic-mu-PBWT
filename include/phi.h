@@ -21,30 +21,23 @@ class phi_ds {
   /**
    * dynamic sparse bitvectors for phi function
    */
-//  std::unordered_map<unsigned int, suc_bv> phi_vec;
   std::vector<suc_bv> phi_vec;
 
   /**
    * dynamic sparse bitvectors for phi_inv function
    */
   std::vector<suc_bv> phi_inv_vec;
-//  std::unordered_map<unsigned int, suc_bv> phi_inv_vec;
 
   /**
    * int vector for prefix samples used by phi function
    */
   std::vector<packed_spsi> phi_supp;
-//  std::vector<succinct_spsi> phi_supp;
-//  std::unordered_map<unsigned int, packed_spsi> phi_supp;
 
   /**
    * int vector for prefix samples used by phi_inv function
    */
   std::vector<packed_spsi> phi_inv_supp;
-//  std::vector<succinct_spsi> phi_inv_supp;
   std::vector<packed_spsi> phi_supp_lcp;
-//  std::vector<succinct_spsi> phi_supp_lcp;
-//  std::unordered_map<unsigned int, packed_spsi> phi_inv_supp;
 
   phi_ds() = default;
   virtual ~phi_ds() = default;
@@ -200,8 +193,6 @@ class phi_ds {
        if(tmp_col == this->phi_supp[pref].size()){
            tmp_col--;
        }
-
-//       auto end_col = this->phi_vec[pref].select1(tmp_col + 1);
        unsigned int match_start = 0;
        if (tmp_col > 0){
          match_start = static_cast<int>(this->phi_supp_lcp[pref].at(tmp_col));
@@ -223,6 +214,7 @@ class phi_ds {
       size += phi_inv_vec[i].bit_size();
       size += phi_supp[i].bit_size();
       size += phi_inv_supp[i].bit_size();
+      size += phi_supp_lcp[i].bit_size();
     }
     // convert to bytes
     size /= 8;

@@ -16,8 +16,6 @@ class dcpbwt_column {
   packed_spsi zeros;
   packed_spsi ones;
   packed_spsi combined;
-//  packed_spsi pref_samples_beg;
-//  packed_spsi pref_samples_end;
   packed_spsi pref_samples_beg;
   packed_spsi pref_samples_end;
   packed_spsi div_samples_beg;

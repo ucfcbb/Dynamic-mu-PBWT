@@ -1,6 +1,5 @@
 #include <iostream>
 #include <getopt.h>
-#include <random>
 #include <fstream>
 #include <chrono>
 
@@ -41,6 +40,7 @@ void Test_Insertion_EmptyPanel(string &ref_vcf_input, string &output_log, bool v
   auto time_insert = (float) (clock() - START_INSERT_OVERALL) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
+  dcpbwt.PrintMemoryUsage(verbose);
   out.close();
 }
 
@@ -71,6 +71,7 @@ void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, str
   auto time_insert = (float) (clock() - START_INSERT_OVERALL) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
+  dcpbwt.PrintMemoryUsage(verbose);
   out.close();
 }
 

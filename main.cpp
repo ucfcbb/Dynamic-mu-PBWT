@@ -233,6 +233,8 @@ int main(int argc, char **argv) {
     }
     DCPBWT dcpbwt(ref_vcf_input, verbose);
     dcpbwt.long_match_query(query_vcf_input, output_file, static_cast<unsigned int>(length), verbose, false);
+    dcpbwt.PrintMemoryUsage(verbose);
+
   }else if (query){
     Insertion_Into_RefPanel(ref_vcf_input, query_vcf_input, verbose);
   } else {

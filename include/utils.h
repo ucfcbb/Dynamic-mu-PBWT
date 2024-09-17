@@ -14,6 +14,7 @@
 
 using namespace std;
 
+
 inline pair<unsigned int, unsigned int> ReadVCF(string &filename) {
   unsigned int M = 0;
   unsigned int N = 0;

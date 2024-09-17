@@ -1815,6 +1815,28 @@ class DCPBWT {
     out_match.close();
   }
 
+  unsigned long long size_in_bytes() {
+    unsigned long long spsi_size_bits = 0;
+    for(unsigned int col=0; col <= this->N; ++col){
+      spsi_size_bits += this->columns[col].combined.bit_size();
+      spsi_size_bits += this->columns[col].zeros.bit_size();
+      spsi_size_bits += this->columns[col].ones.bit_size();
+      spsi_size_bits += this->columns[col].pref_samples_beg.bit_size();
+      spsi_size_bits += this->columns[col].pref_samples_end.bit_size();
+      spsi_size_bits += this->columns[col].div_samples_beg.bit_size();
+    }
+    unsigned long long spsi_size_bytes = spsi_size_bits/8;
+    return spsi_size_bytes;
+  }
+
+  void PrintMemoryUsage(bool verbose=false){
+    unsigned long long all_column_spsi_memory = this->size_in_bytes();
+    unsigned long long phi_memory = this->phi->size_in_bytes(verbose);
+    std::cout << "Memory of dcPBWT column spsis : " << all_column_spsi_memory << " bytes." << std::endl;
+    std::cout << "Memory of dcPBWT phi : " << phi_memory << " bytes." << std::endl;
+    std::cout << "Total Memory of dcPBWT: " << phi_memory + all_column_spsi_memory << " bytes." << std::endl;
+  }
+
   // Build the reference panel
   void BuildFromVCF(std::string &filename, bool verbose) {
     std::string line = "##";
