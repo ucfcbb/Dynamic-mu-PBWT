@@ -23,6 +23,9 @@ class DCPBWT {
   std::vector<dcpbwt_column> columns;
   phi_ds *phi = nullptr;
 
+  // default constructor
+  DCPBWT():M(0), N(0){}
+
   // constructor
   DCPBWT(std::string ref_vcf_file, bool verbose) {
     // TODO: Use htslib
@@ -308,6 +311,7 @@ class DCPBWT {
       // Handle for the N-th column
       if (col == this->N) {
         this->phi->phi_supp[hap_id].set(this->phi->phi_supp[hap_id].size() - 1, inserted_hap_id);
+        this->phi->phi_supp_lcp[hap_id].set(this->phi->phi_supp_lcp[hap_id].size() - 1, temp_div_below_query[col]);
         temp_inv_supp.push_back(hap_id);
       } else {
         this->phi->phi_supp[hap_id].remove(col_rank);
@@ -587,6 +591,7 @@ class DCPBWT {
         unsigned int hap_after = hap_id;
 
         this->phi->phi_supp[hap_after].set(this->phi->phi_supp[hap_after].size() - 1, inserted_hap_id);
+        this->phi->phi_supp_lcp[hap_after].set(this->phi->phi_supp_lcp[hap_after].size() - 1, temp_div_below_query[col]);
         this->phi->phi_inv_supp[hap_before].set(this->phi->phi_inv_supp[hap_before].size() - 1, inserted_hap_id);
         temp_supp.push_back(hap_before);
         temp_inv_supp.push_back(hap_after);
@@ -713,7 +718,7 @@ class DCPBWT {
 
       // update divergence values for sequence BELOW query
       // "starting pos" definition of divergence value
-      if (k != this->N && insertion_indices[k + 1].second == hap_id)
+      if (k != this->N && insertion_indices[k + 1].second == hap_id && temp_div_below_seqn[k+1] < k)
         bs = temp_div_below_seqn[k + 1];
       else if (position != this->M) {
         while (bs > 0 &&
@@ -727,14 +732,15 @@ class DCPBWT {
       // "starting pos" definition of divergence value
       position = insertion_indices[k].first;
       if (position-- != 0) {
-        std::optional<unsigned int> hap_id_above;// = this->phi->phi(hap_id, k);;
+        unsigned int hap_id_above;// = this->phi->phi(hap_id, k);;
         if (position == this->M - 1) {
           hap_id_above = this->columns[k].pref_samples_end.at(this->columns[k].combined.size() - 1);
         } else {
-          hap_id_above = this->phi->phi(hap_id, k);
+          auto hap_id_above_opt = this->phi->phi(hap_id, k);
+          assert(hap_id_above_opt.has_value());
+          hap_id_above = hap_id_above_opt.value();
         }
-        assert(hap_id_above.has_value());
-        if (k != this->N && hap_id_above_prev == hap_id_above.value())
+        if (k != this->N && hap_id_above_prev == hap_id_above && temp_div_seqn[k+1] < k)
           zs = temp_div_seqn[k + 1];
         else {
           while (zs > 0 &&
@@ -742,8 +748,10 @@ class DCPBWT {
             position = reverse_lf(zs, position);
             --zs;
           }
-          hap_id_above_prev = hap_id_above.value();
         }
+        hap_id_above_prev = hap_id_above;
+      } else {
+        hap_id_above_prev = this->M;
       }
       temp_div_seqn[k] = zs;
       temp_div_below_seqn[k] = bs;
@@ -751,7 +759,75 @@ class DCPBWT {
     temp_div_seqn[0] = temp_div_below_seqn[0] = 0;
   }
 
+  void InsertFirstHaplotype(std::vector<bool>& query){
+    unsigned int cnt_0 = 0;
+    for (unsigned int i = 0; i < query.size(); ++i){
+      packed_spsi temp_ones, temp_zeros, temp_combined;
+      packed_spsi temp_sample_beg, temp_sample_end, temp_div;
+      cnt_0 = 0;
+      if (query[i]){
+        temp_ones.push_back(1);
+      } else {
+        temp_zeros.push_back(1);
+        cnt_0 = 1;
+      }
+      temp_combined.push_back(1);
+      temp_sample_beg.push_back(this->M);
+      temp_sample_end.push_back(this->M);
+      temp_div.push_back(i);
+      // build each column
+      dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                         (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
+                         !query[i], cnt_0);
+      this->columns.push_back(coln);
+    }
+    // Handle for N-th coln
+    packed_spsi temp_ones, temp_zeros, temp_combined;
+    packed_spsi temp_sample_beg, temp_sample_end, temp_div;
+    if (query[query.size() - 1]) {
+      temp_ones.push_back(1);
+    } else {
+      temp_zeros.push_back(1);
+      cnt_0 = 1;
+    }
+    temp_combined.push_back(1);
+    temp_sample_beg.push_back(this->M);
+    temp_sample_end.push_back(this->M);
+    temp_div.push_back(query.size());
+    dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                       (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
+                       !query[query.size() - 1], cnt_0);
+    this->columns.push_back(coln);
+    assert(this->columns.size() == query.size() + 1);
+
+    // initialize new phi structure
+    this->phi = new phi_ds();
+    suc_bv tmp_b, tmp_e;
+    packed_spsi temp_supp;
+    packed_spsi temp_inv_supp;
+    packed_spsi temp_div_supp;
+    for (unsigned int col = 0; col <= query.size(); ++col) {
+      tmp_b.push_back(true);
+      tmp_e.push_back(true);
+      temp_supp.push_back(this->M);
+      temp_inv_supp.push_back(this->M);
+      temp_div_supp.push_back(col);
+    }
+    this->phi->phi_vec.push_back(tmp_b);
+    this->phi->phi_inv_vec.push_back(tmp_e);
+    this->phi->phi_supp.push_back(temp_supp);
+    this->phi->phi_inv_supp.push_back(temp_inv_supp);
+    this->phi->phi_supp_lcp.push_back(temp_div_supp);
+    ++this->M;
+    this->N = query.size();
+  }
+
   void InsertSingleHaplotype(std::vector<bool> &query) {
+    if (this->M == 0){
+      InsertFirstHaplotype(query);
+      return;
+    }
+
     assert(query.size() == N);
     vector<pair<unsigned int, unsigned int>> insertion_indices(this->N + 1); // stores {index, hapid}
     insertion_indices[0].first = this->M;
@@ -1794,9 +1870,9 @@ class DCPBWT {
         packed_spsi temp_zeros;
         packed_spsi temp_ones;
         packed_spsi temp_combined;
-        succinct_spsi temp_sample_beg;
-        succinct_spsi temp_sample_end;
-        succinct_spsi temp_div;
+        packed_spsi temp_sample_beg;
+        packed_spsi temp_sample_end;
+        packed_spsi temp_div;
         bool start_with_zero = false;
         assert(single_col.size() == this->M);
         p = col + 1;
@@ -1911,9 +1987,9 @@ class DCPBWT {
       packed_spsi temp_zeros;
       packed_spsi temp_ones;
       packed_spsi temp_combined;
-      succinct_spsi temp_sample_beg;
-      succinct_spsi temp_sample_end;
-      succinct_spsi temp_div;
+      packed_spsi temp_sample_beg;
+      packed_spsi temp_sample_end;
+      packed_spsi temp_div;
       bool start_with_zero = false;
       assert(single_col.size() == this->M);
       p = col + 1;

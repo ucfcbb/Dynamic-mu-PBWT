@@ -18,9 +18,9 @@ class dcpbwt_column {
   packed_spsi combined;
 //  packed_spsi pref_samples_beg;
 //  packed_spsi pref_samples_end;
-  succinct_spsi pref_samples_beg;
-  succinct_spsi pref_samples_end;
-  succinct_spsi div_samples_beg;
+  packed_spsi pref_samples_beg;
+  packed_spsi pref_samples_end;
+  packed_spsi div_samples_beg;
   bool start_with_zero;
   // TODO: don't need this, as zeros can get this number
   // TODO: For now keeping it for the sake of ease
@@ -29,9 +29,9 @@ class dcpbwt_column {
   dcpbwt_column(packed_spsi zeros,
                 packed_spsi ones,
                 packed_spsi combined,
-                succinct_spsi pref_samples_beg,
-                succinct_spsi pref_samples_end,
-                succinct_spsi div_samples_beg,
+                packed_spsi pref_samples_beg,
+                packed_spsi pref_samples_end,
+                packed_spsi div_samples_beg,
                 bool start_with_zero,
                 unsigned int num_zeros) : zeros(std::move(zeros)),
                                           ones(std::move(ones)),
