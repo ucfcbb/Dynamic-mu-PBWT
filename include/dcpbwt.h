@@ -1823,7 +1823,6 @@ class DCPBWT {
       while (line[1] == '#') {
         getline(inFile, line);
       }
-
       // read individual ids
       std::istringstream iss(line);
       std::string token;
@@ -1834,7 +1833,6 @@ class DCPBWT {
         // M += 2;
         // individual_ids.push_back(token);
       }
-
       // go through all sites
       vector<unsigned int> u, v;
       vector<unsigned int> freq;
