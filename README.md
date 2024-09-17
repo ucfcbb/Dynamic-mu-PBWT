@@ -27,7 +27,7 @@ There should be a `build` directory inside the cloned folder and this directory
 should contain the executable `dcpbwt`.
 
 Test the run by running the executable as follows:
-`./build/./dcpbwt`
+`./build/dcpbwt`
 
 It should print out the usage information.
 

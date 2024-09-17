@@ -2,7 +2,6 @@
 #include <getopt.h>
 #include <random>
 #include <fstream>
-#include <iomanip>
 #include <chrono>
 
 #include "dcpbwt.h"
@@ -13,13 +12,39 @@ void PrintHelp() {
   std::cout << "Options:" << std::endl;
   std::cout << "  -i, --input ref <path>\t vcf file for panel" << std::endl;
   std::cout << "  -q, --input query <path>\t vcf file for panel" << std::endl;
-  std::cout << "  -o, --output log <path>\t txt file for log" << std::endl;
-  std::cout << "  -l, --input length <int>\t of match" << std::endl;
+  std::cout << "  -o, --output log <path>\t txt file for logging the insertion times" << std::endl;
   std::cout << "  -v, --verbose <path>\t show detail information" << std::endl;
   std::cout << "  -h, --help\t show this help message and exit" << std::endl;
 }
 
-void Test_Insertion(string &ref_vcf_input, string &query_vcf_input, string &output_log, bool verbose) {
+void Test_Insertion_EmptyPanel(string &ref_vcf_input, string &output_log, bool verbose) {
+  DCPBWT dcpbwt;
+  cout << "Testing Insertion...\n";
+  vector<vector<bool>> alleles;
+  clock_t START_query_read = clock();
+  ReadQueryVCF(ref_vcf_input, alleles);
+  auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
+  cout << "Time to read query alleles: " << time_read_query << " s\n";
+
+  // go through all query haplotypes
+  ofstream out;
+  out.open(output_log);
+  vector<double> insert_per_hap;
+  clock_t START_INSERT_OVERALL = clock();
+  for (auto & allele : alleles) {
+    auto begin = std::chrono::high_resolution_clock::now();
+    dcpbwt.InsertSingleHaplotype(allele);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto time_insert_per_hap = std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
+    out << time_insert_per_hap << "\n";
+  }
+  auto time_insert = (float) (clock() - START_INSERT_OVERALL) / CLOCKS_PER_SEC;
+  cout << "Inserted " << alleles.size() << " haplotypes.\n";
+  cout << "Insertion took: " << time_insert << " s.\n";
+  out.close();
+}
+
+void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, string &output_log, bool verbose) {
   ofstream out;
   vector<double> insert_per_hap;
   out.open(output_log);
@@ -36,26 +61,18 @@ void Test_Insertion(string &ref_vcf_input, string &query_vcf_input, string &outp
 
   // go through all query haplotypes
   clock_t START_INSERT_OVERALL = clock();
-  for (int i = 0; i < alleles.size(); ++i) {
+  for (auto & allele : alleles) {
     auto begin = std::chrono::high_resolution_clock::now();
-    dcpbwt.InsertSingleHaplotype(alleles[i]);
+    dcpbwt.InsertSingleHaplotype(allele);
     auto end = std::chrono::high_resolution_clock::now(); 
     auto time_insert_per_hap = std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
-    //insert_per_hap.push_back(time_insert_per_hap);
     out << time_insert_per_hap << "\n";
   }
   auto time_insert = (float) (clock() - START_INSERT_OVERALL) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
-
-  //if (out.is_open()){
-  //  for(auto val: insert_per_hap){
-  //    out << std::setprecision(10) << val << "\n";
-  //  }
-  //}
   out.close();
 }
-
 
 
 int main(int argc, char **argv) {
@@ -100,14 +117,18 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
   }
+  bool query = false;
   if (!filesystem::exists(input_vcf)) {
     cerr << "Input vcf : " << input_vcf << " doesn't exist!\n";
     exit(EXIT_FAILURE);
   }
-  if (!filesystem::exists(query_vcf)) {
-    cerr << "Query vcf : " << query_vcf << " doesn't exist!\n";
-    exit(EXIT_FAILURE);
+  if (filesystem::exists(query_vcf)) {
+    query = true;
   }
 
-  Test_Insertion(input_vcf, query_vcf, output_log,verbose);
+  if (query){
+    Test_Insertion_RefPanel(input_vcf, query_vcf, output_log, verbose);
+  } else {
+    Test_Insertion_EmptyPanel(input_vcf, output_log, verbose);
+  }
 }
