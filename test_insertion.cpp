@@ -42,6 +42,7 @@ void Test_Insertion_EmptyPanel(string &ref_vcf_input, string &output_log, bool v
   cout << "Insertion took: " << time_insert << " s.\n";
   dcpbwt.PrintMemoryUsage(verbose);
   out.close();
+  cout << "Avg. runs: " << dcpbwt.get_avg_runs() << "." << std::endl;
 }
 
 void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, string &output_log, bool verbose) {
@@ -72,6 +73,7 @@ void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, str
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
   cout << "Insertion took: " << time_insert << " s.\n";
   dcpbwt.PrintMemoryUsage(verbose);
+  cout << "Avg. runs: " << dcpbwt.get_avg_runs() << "." << std::endl;
   out.close();
 }
 

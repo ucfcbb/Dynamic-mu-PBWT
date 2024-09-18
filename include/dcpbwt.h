@@ -1837,6 +1837,14 @@ class DCPBWT {
     std::cout << "Total Memory of dcPBWT: " << phi_memory + all_column_spsi_memory << " bytes." << std::endl;
   }
 
+  double get_avg_runs(){
+    double total_runs = 0;
+    for (unsigned int col = 0; col < this->N; ++col)
+      total_runs += this->columns[col].combined.size();
+    double avg_runs = total_runs/this->N;
+    return avg_runs;
+  }
+
   // Build the reference panel
   void BuildFromVCF(std::string &filename, bool verbose) {
     std::string line = "##";
