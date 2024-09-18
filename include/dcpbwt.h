@@ -819,6 +819,7 @@ class DCPBWT {
     this->phi->phi_inv_supp.push_back(temp_inv_supp);
     this->phi->phi_supp_lcp.push_back(temp_div_supp);
     ++this->M;
+    ++this->phi->total_haplotypes;
     this->N = query.size();
   }
 
