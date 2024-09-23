@@ -244,7 +244,10 @@ int main(int argc, char **argv) {
     Insertion_Into_RefPanel(ref_vcf_input, query_vcf_input, verbose);
   } else {
     if (build){
+      clock_t START = clock();
       DCPBWT dcpbwt(ref_vcf_input, verbose);
+      auto time_build = (float)(clock() - START)/CLOCKS_PER_SEC;
+      std::cout << "Build took " << time_build << " seconds." << std::endl;
       dcpbwt.PrintMemoryUsage(verbose);
     }else{
       Insertion_Into_Empty_Panel(ref_vcf_input, verbose);
