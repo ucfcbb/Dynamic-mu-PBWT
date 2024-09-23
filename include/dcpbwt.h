@@ -32,6 +32,8 @@ class DCPBWT {
   DCPBWT(std::string ref_vcf_file, bool verbose) {
     // extract alleles from VCF
     Build(ref_vcf_file.c_str(), verbose);
+    std::cout << "Total haplotypes: " << this->M << std::endl;
+    std::cout << "Total sites: " << this->N << std::endl;
   }
   ~DCPBWT() {
     delete phi;
