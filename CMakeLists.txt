@@ -13,13 +13,10 @@ else()
   add_compile_options(-Wall -Wextra -O3 -march=native -fopenmp -ffast-math ${OpenMP_CXX_FLAGS})
 endif()
 
-include(${CMAKE_ROOT}/Modules/ExternalProject.cmake)
-
 add_executable(${EXE_NAME} main.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h
 )
-
 add_executable(test_insert test_insertion.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h)
@@ -42,11 +39,12 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     endif()
 endif()
 
+# External Libraries
+# DYNAMIC
 add_subdirectory(external/DYNAMIC)
 
-# Build htslib using External Project
+# Build htslib
 include(FetchContent)
-#add HTSlib
 FetchContent_Declare(
         htslib
         GIT_REPOSITORY https://github.com/samtools/htslib.git
@@ -91,8 +89,8 @@ target_include_directories(htslib INTERFACE ${htslib_SRC})
 target_include_directories(${EXE_NAME} PUBLIC external/DYNAMIC/include PUBLIC include)
 target_include_directories(test_insert PUBLIC external/DYNAMIC/include PUBLIC include)
 target_include_directories(test_delete PUBLIC external/DYNAMIC/include PUBLIC include)
-target_include_directories(packTest PUBLIC external/DYNAMIC/include PUBLIC include)
 
+# DYNAMIC's hopscotch dependency
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
 
 target_link_libraries(${EXE_NAME} ${OpenMP_CXX_LIBRARIES})
