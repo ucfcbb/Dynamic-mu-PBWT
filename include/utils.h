@@ -12,6 +12,8 @@
 #include <sstream>
 #include <filesystem>
 
+#include "htslib/vcf.h"
+
 using namespace std;
 
 
@@ -47,6 +49,43 @@ inline pair<unsigned int, unsigned int> ReadVCF(string &filename) {
   }
   std::cout << "M (# of haplotypes) = " << M << " : N (# of sites) = " << N << "\n";
   return {M, N};
+}
+
+inline void ReadQueryFile(const char* query_vcf, std::vector<std::vector<bool>> &queries){
+  htsFile *fp = hts_open(query_vcf, "rb");
+  std::cout << "Reading VCF file...\n";
+  bcf_hdr_t *hdr = bcf_hdr_read(fp);
+  bcf1_t *rec = bcf_init();
+  bool first = true;
+  while (bcf_read(fp, hdr, rec) >= 0) {
+    bcf_unpack(rec, BCF_UN_ALL);
+    // read SAMPLE
+    int32_t *gt_arr = NULL, ngt_arr = 0;
+    int i, j, ngt, nsmpl = bcf_hdr_nsamples(hdr);
+    ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+    int max_ploidy = ngt / nsmpl;
+    for (i = 0; i < nsmpl; i++) {
+      int32_t *ptr = gt_arr + i * max_ploidy;
+      for (j = 0; j < max_ploidy; j++) {
+        // if true, the sample has smaller ploidy
+        if (ptr[j] == bcf_int32_vector_end) break;
+        // missing allele
+        if (bcf_gt_is_missing(ptr[j])) exit(-1);
+        // the VCF 0-based allele index
+        int allele_index = bcf_gt_allele(ptr[j]);
+        if (first){
+          queries.push_back({allele_index == 1});
+        } else {
+          queries[2*i + j].push_back(allele_index == 1);
+        }
+      }
+    }
+    first = false;
+    free(gt_arr);
+  }
+  bcf_hdr_destroy(hdr);
+  hts_close(fp);
+  bcf_destroy(rec);
 }
 
 inline void ReadQueryVCF(string &filename, vector<vector<bool>> &alleles) {

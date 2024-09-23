@@ -94,7 +94,7 @@ void Test_BottomUp_Delete(DCPBWT &dcpbwt) {
   cout << "Testing Deletion BottomUp i.e. from last haplotype to first haplotype in order...\n";
   int total = dcpbwt.M;
   for (int i = total - 1; i >= 0; --i) {
-    dcpbwt.DeleteSingleHaplotype_v2(dcpbwt.M - 1);
+    dcpbwt.DeleteSingleHaplotype(dcpbwt.M - 1);
     cout << "Deleted hap " << i << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
@@ -105,7 +105,7 @@ void Test_TopDown_Delete(DCPBWT &dcpbwt) {
   int total = dcpbwt.M;
   int hap_id = 0;
   for (int i = 0; i < total; ++i) {
-    dcpbwt.DeleteSingleHaplotype_v2(hap_id);
+    dcpbwt.DeleteSingleHaplotype(hap_id);
     cout << i << ". Deleted hap " << hap_id << "\n";
   }
   dcpbwt.DeleteSingleHaplotype(0);
@@ -116,7 +116,7 @@ void Insertion_Into_Empty_Panel(string &vcf_input, bool verbose) {
   cout << "Inserting...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryVCF(vcf_input, alleles);
+  ReadQueryFile(vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 
@@ -135,6 +135,8 @@ void Insertion_Into_Empty_Panel(string &vcf_input, bool verbose) {
   }
 }
 
+
+
 void Insertion_Into_RefPanel(string &ref_vcf_input, string &query_vcf_input, bool verbose) {
   clock_t START = clock();
   DCPBWT dcpbwt(ref_vcf_input, verbose);
@@ -144,7 +146,7 @@ void Insertion_Into_RefPanel(string &ref_vcf_input, string &query_vcf_input, boo
   cout << "Inserting...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryVCF(query_vcf_input, alleles);
+  ReadQueryFile(query_vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 

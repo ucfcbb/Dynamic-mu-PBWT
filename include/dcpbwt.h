@@ -6,11 +6,14 @@
 #include <fstream>
 #include <numeric>
 #include <sstream>
+#include <exception>
 
 #include "dynamic/dynamic.hpp"
 #include "phi.h"
 #include "dcpbwt_column.h"
 #include "utils.h"
+
+#include "htslib/vcf.h"
 
 using namespace dyn;
 using namespace std;
@@ -19,7 +22,6 @@ class DCPBWT {
  public:
   unsigned int M; // #haplotypes
   unsigned int N; // #sites
-  set<unsigned int> haplotype_ids;
   std::vector<dcpbwt_column> columns;
   phi_ds *phi = nullptr;
 
@@ -28,15 +30,8 @@ class DCPBWT {
 
   // constructor
   DCPBWT(std::string ref_vcf_file, bool verbose) {
-    // TODO: Use htslib
     // extract alleles from VCF
-    auto retval = ReadVCF(ref_vcf_file);
-    this->M = retval.first;
-    this->N = retval.second;
-    for (unsigned int i = 0; i < M; ++i) {
-      haplotype_ids.insert(i);
-    }
-    BuildFromVCF(ref_vcf_file, verbose);
+    Build(ref_vcf_file.c_str(), verbose);
   }
   ~DCPBWT() {
     delete phi;
@@ -891,7 +886,6 @@ class DCPBWT {
     this->phi->phi_inv_supp.push_back(temp_inv_supp);
     this->phi->phi_supp_lcp.push_back(temp_div_supp);
     // increment total # of haplotypes
-    this->haplotype_ids.insert(this->M);
     ++this->M;
     ++this->phi->total_haplotypes;
   }
@@ -1329,7 +1323,7 @@ class DCPBWT {
    * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)
    * Result: Deletes that haplotype's allele from all columns
    */
-  void DeleteSingleHaplotype_v2(const unsigned int hap_id) {
+  void DeleteSingleHaplotype(const unsigned int hap_id) {
     if (this->M == 0) {
       cerr << "Panel is empty. Nothing to delete! \n";
       return;
@@ -1491,79 +1485,79 @@ class DCPBWT {
     }
   }
 
-  /*
-   * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)
-   * Result: Deletes that haplotype's allele from all columns
-   */
-  void DeleteSingleHaplotype(const unsigned int idx) {
-    if (this->M == 0) {
-      cerr << "Panel is empty. Nothing to delete! \n";
-      return;
-    }
-    if (idx >= this->M) {
-      cerr << "Invalid index to delete! Index should be in the range [0, " << this->M << ").\n";
-      return;
-    }
-
-    // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
-    // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
-    //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
-    // Get appropriate haplotype_index
-    auto it = haplotype_ids.begin();
-    std::advance(it, idx);
-    unsigned int hap_id = *it;
-
-    vector<pair<unsigned int, unsigned int>> haplotype_info(this->N + 1); // {index, hapid}
-    vector<bool> alleles;
-    haplotype_info[0].first = idx;
-    haplotype_info[0].second = hap_id;
-
-    /*
-    * find where each the target haplotype is mapped to in each column
-    * Also find the allele values of the haplotype to be deleted
-    */
-    for (unsigned int col = 0; col < this->N; ++col) {
-      unsigned int run_idx = get_run_idx(col, haplotype_info[col].first);
-      const bool allele = this->get_run_val(col, run_idx);
-      haplotype_info[col + 1] = w_mod(haplotype_info[col].first, col, allele, haplotype_info[col].second);
-      alleles.push_back(allele);
-    }
-    assert(haplotype_info.size() == this->N + 1);
-    assert(alleles.size() == this->N);
-
-    // Perform deletion from each column
-    for (unsigned int col = 0; col < this->N; ++col) {
-      Delete(col, haplotype_info[col].first, haplotype_info[col].second, alleles[col]);
-    }
-    // Delete at the N-th column
-    Delete(this->N, haplotype_info[this->N].first, haplotype_info[this->N].second, alleles[this->N - 1]);
-
-    // checks
-    for (unsigned int i = 0; i <= this->N; ++i) {
-      assert(static_cast<bool>(this->phi->phi_vec[hap_id].at(i)) == false);
-      assert(static_cast<bool>(this->phi->phi_inv_vec[hap_id].at(i)) == false);
-    }
-    assert(this->phi->phi_supp[hap_id].size() == 1);
-    assert(this->phi->phi_inv_supp[hap_id].size() == 1);
-
-    // Handle for last column (Nth) update
-    auto last_above = this->phi->phi_supp[hap_id].at(0);
-    auto last_below = this->phi->phi_inv_supp[hap_id].at(0);
-    if (last_above != hap_id) {
-      if (last_below == hap_id)
-        last_below = last_above;
-      this->phi->phi_inv_supp[last_above].set(this->phi->phi_inv_supp[last_above].size() - 1, last_below);
-    }
-    if (last_below != hap_id) {
-      if (last_above == hap_id)
-        last_above = last_below;
-      this->phi->phi_supp[last_below].set(this->phi->phi_supp[last_below].size() - 1, last_above);
-    }
-
-    haplotype_ids.erase(hap_id);
-    --this->M;
-    --this->phi->total_haplotypes;
-  }
+//  /*
+//   * Input: haplotype index which will also be haplotype id for the first column (index is 0-based)
+//   * Result: Deletes that haplotype's allele from all columns
+//   */
+//  void DeleteSingleHaplotype(const unsigned int idx) {
+//    if (this->M == 0) {
+//      cerr << "Panel is empty. Nothing to delete! \n";
+//      return;
+//    }
+//    if (idx >= this->M) {
+//      cerr << "Invalid index to delete! Index should be in the range [0, " << this->M << ").\n";
+//      return;
+//    }
+//
+//    // TODO: need a way to convert the hap_idx to it's corresponding hap_ID if the panel's been updated already (i.e. in case of deletion)
+//    // E.g. hap_idx: 0 1 2 3 4 5 => delete(3) => 0 1 2 x 3 4
+//    //       hap_ID: 0 1 2 3 4 5 => delete(3) => 0 1 2 3 4 5
+//    // Get appropriate haplotype_index
+//    auto it = haplotype_ids.begin();
+//    std::advance(it, idx);
+//    unsigned int hap_id = *it;
+//
+//    vector<pair<unsigned int, unsigned int>> haplotype_info(this->N + 1); // {index, hapid}
+//    vector<bool> alleles;
+//    haplotype_info[0].first = idx;
+//    haplotype_info[0].second = hap_id;
+//
+//    /*
+//    * find where each the target haplotype is mapped to in each column
+//    * Also find the allele values of the haplotype to be deleted
+//    */
+//    for (unsigned int col = 0; col < this->N; ++col) {
+//      unsigned int run_idx = get_run_idx(col, haplotype_info[col].first);
+//      const bool allele = this->get_run_val(col, run_idx);
+//      haplotype_info[col + 1] = w_mod(haplotype_info[col].first, col, allele, haplotype_info[col].second);
+//      alleles.push_back(allele);
+//    }
+//    assert(haplotype_info.size() == this->N + 1);
+//    assert(alleles.size() == this->N);
+//
+//    // Perform deletion from each column
+//    for (unsigned int col = 0; col < this->N; ++col) {
+//      Delete(col, haplotype_info[col].first, haplotype_info[col].second, alleles[col]);
+//    }
+//    // Delete at the N-th column
+//    Delete(this->N, haplotype_info[this->N].first, haplotype_info[this->N].second, alleles[this->N - 1]);
+//
+//    // checks
+//    for (unsigned int i = 0; i <= this->N; ++i) {
+//      assert(static_cast<bool>(this->phi->phi_vec[hap_id].at(i)) == false);
+//      assert(static_cast<bool>(this->phi->phi_inv_vec[hap_id].at(i)) == false);
+//    }
+//    assert(this->phi->phi_supp[hap_id].size() == 1);
+//    assert(this->phi->phi_inv_supp[hap_id].size() == 1);
+//
+//    // Handle for last column (Nth) update
+//    auto last_above = this->phi->phi_supp[hap_id].at(0);
+//    auto last_below = this->phi->phi_inv_supp[hap_id].at(0);
+//    if (last_above != hap_id) {
+//      if (last_below == hap_id)
+//        last_below = last_above;
+//      this->phi->phi_inv_supp[last_above].set(this->phi->phi_inv_supp[last_above].size() - 1, last_below);
+//    }
+//    if (last_below != hap_id) {
+//      if (last_above == hap_id)
+//        last_above = last_below;
+//      this->phi->phi_supp[last_below].set(this->phi->phi_supp[last_below].size() - 1, last_above);
+//    }
+//
+//    haplotype_ids.erase(hap_id);
+//    --this->M;
+//    --this->phi->total_haplotypes;
+//  }
 
   std::vector<std::tuple<int, int, int>> compute_ms_long(vector<bool> &query,
                                                          const unsigned int length,
@@ -1712,59 +1706,10 @@ class DCPBWT {
   void long_match_query(string &query_vcf, string &out, unsigned int length = 0,
                         bool verbose = false, bool load_panel = false) {
     std::ofstream out_match(out);
-    /*
-    std::vector<std::string> queries_panel;
-    htsFile *fp = hts_open(filename, "rb");
-    std::cout << "Reading VCF file...\n";
-    bcf_hdr_t *hdr = bcf_hdr_read(fp);
-    bcf1_t *rec = bcf_init();
-    std::string new_column;
-    while (bcf_read(fp, hdr, rec) >= 0) {
-      new_column = "";
-      bcf_unpack(rec, BCF_UN_ALL);
-      // read SAMPLE
-      int32_t *gt_arr = NULL, ngt_arr = 0;
-      int i, j, ngt, nsmpl = bcf_hdr_nsamples(hdr);
-      ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
-      int max_ploidy = ngt / nsmpl;
-      for (i = 0; i < nsmpl; i++) {
-        int32_t *ptr = gt_arr + i * max_ploidy;
-        for (j = 0; j < max_ploidy; j++) {
-          // if true, the sample has smaller ploidy
-          if (ptr[j] == bcf_int32_vector_end) break;
 
-          // missing allele
-          if (bcf_gt_is_missing(ptr[j])) exit(-1);
-
-          // the VCF 0-based allele index
-          int allele_index = bcf_gt_allele(ptr[j]);
-          new_column += std::to_string(allele_index);
-        }
-      }
-      free(gt_arr);
-      queries_panel.push_back(new_column);
-    }
-    bcf_hdr_destroy(hdr);
-    hts_close(fp);
-    bcf_destroy(rec);
-    std::string query;
-    std::vector<std::string> queries;
-    if (out_match.is_open()) {
-      for (unsigned int i = 0; i < queries_panel[0].size(); i++) {
-        if (verbose) {
-          std::cout << i << ": \n";
-        }
-        for (auto &j : queries_panel) {
-          query.push_back(j[i]);
-        }
-        queries.push_back(query);
-        query.clear();
-      }
-
-     */
     vector<vector<bool>> queries;
-    ReadQueryVCF(query_vcf, queries);
-    auto n_queries = queries.size();
+    ReadQueryFile(query_vcf.c_str(), queries);
+    unsigned int n_queries = queries.size();
     std::vector<std::vector<std::tuple<int, int, int>>> matches_vec(n_queries);
     clock_t START = clock();
     if (load_panel) {
@@ -1783,12 +1728,6 @@ class DCPBWT {
     }
     auto query_time = (float)(clock() - START)/CLOCKS_PER_SEC;
     std::cout << "Time to query = " << query_time << " s.\n";
-
-    // find long match query and report
-    // un-parallelized version
-//                for(unsigned int i = 0; i < n_queries; i++){
-//                    matches_vec[i] = this->compute_ms_long(queries[i], length, verbose);
-//                }
 
     // report long matches
     START = clock();
@@ -1844,6 +1783,272 @@ class DCPBWT {
       total_runs += this->columns[col].combined.size();
     double avg_runs = total_runs/this->N;
     return avg_runs;
+  }
+
+  // Build the reference panel using htslib
+  void Build(const char* filename, bool verbose) {
+    htsFile *fp = hts_open(filename, "rb");
+    std::cout << "Building panel from: " << filename <<  std::endl;
+    if (fp == NULL) {
+      std::cerr << "VCF file: " << filename << " not found!" << std::endl;
+      return;
+    }
+    bcf_hdr_t *hdr = bcf_hdr_read(fp);
+    bcf1_t *rec = bcf_init();
+    this->M = bcf_hdr_nsamples(hdr) * 2;
+    fp = hts_open(filename, "rb");
+    hdr = bcf_hdr_read(fp);
+    rec = bcf_init();
+
+    // go through all sites
+    vector<unsigned int> u, v;
+    vector<unsigned int> freq;
+    unsigned int total_runs = 0;
+    unsigned int col = 0;
+    int cnt = 1;
+    bool prev_allele = false;
+    // TODO: Possible optimization using sdsl int vec
+    vector<unsigned int> prefix_arr(M, 0);
+    std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
+    // TODO: Possible optimization using sdsl int vec
+    vector<vector<unsigned int>> sites_where_sample_beg(M);
+    vector<vector<unsigned int>> sites_where_sample_end(M);
+    vector<unsigned int> div(M, 0);
+    vector<unsigned int> div_u, div_v;
+    unsigned int p = col + 1, q = col + 1;
+
+    // iterate each vcf record
+    vector<bool> single_col;
+    while (bcf_read(fp, hdr, rec) >= 0) {
+      this->N++;
+      single_col.clear();
+      bcf_unpack(rec, BCF_UN_ALL);
+      // read SAMPLE
+      int32_t *gt_arr = nullptr, ngt_arr = 0;
+      int i, j, ngt, nsmpl = bcf_hdr_nsamples(hdr);
+      ngt = bcf_get_genotypes(hdr, rec, &gt_arr, &ngt_arr);
+      int max_ploidy = ngt / nsmpl;
+      for (i = 0; i < nsmpl; i++) {
+        int32_t *ptr = gt_arr + i * max_ploidy;
+        for (j = 0; j < max_ploidy; j++) {
+          // if true, the sample has smaller ploidy
+          if (ptr[j] == bcf_int32_vector_end) break;
+
+          // missing allele
+          if (bcf_gt_is_missing(ptr[j])) exit(-1);
+
+          // the VCF 0-based allele index
+          int allele_index = bcf_gt_allele(ptr[j]);
+          single_col.push_back(allele_index == 1);
+        }
+      }
+      // Build column
+      packed_spsi temp_zeros;
+      packed_spsi temp_ones;
+      packed_spsi temp_combined;
+      packed_spsi temp_sample_beg;
+      packed_spsi temp_sample_end;
+      packed_spsi temp_div;
+      bool start_with_zero = false;
+      assert(single_col.size() == this->M);
+      p = col + 1;
+      q = col + 1;
+      for (unsigned int i = 0; i < this->M; ++i) {
+        // first allele
+        if (i == 0) {
+          if (single_col[prefix_arr[i]]) { // allele: 1
+            v.push_back(prefix_arr[i]);
+            div_v.push_back(q);
+            q = 0;
+          } else { // allele: 0
+            u.push_back(prefix_arr[i]);
+            start_with_zero = true;
+            div_u.push_back(p);
+            p = 0;
+          }
+          temp_sample_beg.push_back(prefix_arr[i]);
+          temp_div.push_back(div[i]);
+          prev_allele = single_col[prefix_arr[i]];
+          cnt = 1;
+          continue;
+        }
+
+        // at run-change
+        if (single_col[prefix_arr[i]] != prev_allele) {
+          freq.push_back(cnt);
+          prev_allele = single_col[prefix_arr[i]];
+          cnt = 1;
+          temp_sample_beg.push_back(prefix_arr[i]);
+          temp_sample_end.push_back(prefix_arr[i - 1]);
+          temp_div.push_back(div[i]);
+        } else {
+          ++cnt;
+        }
+        if (div[i] > p) {
+          p = div[i];
+        }
+        if (div[i] > q) {
+          q = div[i];
+        }
+        if (single_col[prefix_arr[i]]) { // allele 1
+          v.push_back(prefix_arr[i]);
+          div_v.push_back(q);
+          q = 0;
+        } else { // allele 0
+          u.push_back(prefix_arr[i]);
+          div_u.push_back(p);
+          p = 0;
+        }
+      }
+      temp_sample_end.push_back(prefix_arr[M - 1]);
+      // edge case
+      if (cnt > 0)
+        freq.push_back(cnt);
+
+      // populate dynamic data structures
+      for (unsigned int i = 0; i < freq.size(); ++i) {
+        temp_combined.push_back(freq[i]);
+        if (start_with_zero) {
+          if (i % 2 == 0) {
+            temp_zeros.push_back(freq[i]);
+          } else {
+            temp_ones.push_back(freq[i]);
+          }
+        } else {
+          if (i % 2 == 0) {
+            temp_ones.push_back(freq[i]);
+          } else {
+            temp_zeros.push_back(freq[i]);
+          }
+        }
+      }
+
+      assert(temp_combined.size() == temp_sample_beg.size());
+      assert(temp_combined.size() == temp_sample_end.size());
+      assert(temp_div.size() == temp_combined.size());
+      for (unsigned int i = 0; i < temp_sample_beg.size(); ++i) {
+        sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
+        sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
+      }
+
+      // build each column
+      dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                         (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
+                         start_with_zero, u.size());
+      columns.emplace_back(coln);
+      total_runs += freq.size();
+
+      // next col prefix arr
+      prefix_arr.clear();
+      prefix_arr.insert(prefix_arr.end(), u.begin(), u.end());
+      prefix_arr.insert(prefix_arr.end(), v.begin(), v.end());
+      div.clear();
+      div.insert(div.end(), div_u.begin(), div_u.end());
+      div.insert(div.end(), div_v.begin(), div_v.end());
+      div_u.clear();
+      div_v.clear();
+      ++col;
+      u.clear();
+      v.clear();
+      freq.clear();
+
+      free(gt_arr);
+    }
+
+    // Handle for last column
+    packed_spsi temp_zeros;
+    packed_spsi temp_ones;
+    packed_spsi temp_combined;
+    packed_spsi temp_sample_beg;
+    packed_spsi temp_sample_end;
+    packed_spsi temp_div;
+    bool start_with_zero = false;
+    assert(single_col.size() == this->M);
+    p = col + 1;
+    q = col + 1;
+    for (unsigned int i = 0; i < this->M; ++i) {
+      // first allele
+      if (i == 0) {
+        if (single_col[prefix_arr[i]]) { // allele: 1
+          v.push_back(prefix_arr[i]);
+          div_v.push_back(q);
+          q = 0;
+        } else { // allele: 0
+          u.push_back(prefix_arr[i]);
+          start_with_zero = true;
+          div_u.push_back(p);
+          p = 0;
+        }
+        temp_sample_beg.push_back(prefix_arr[i]);
+        temp_div.push_back(div[i]);
+        prev_allele = single_col[prefix_arr[i]];
+        cnt = 1;
+        continue;
+      }
+
+      // at run-change
+      if (single_col[prefix_arr[i]] != prev_allele) {
+        freq.push_back(cnt);
+        prev_allele = single_col[prefix_arr[i]];
+        cnt = 1;
+        temp_sample_beg.push_back(prefix_arr[i]);
+        temp_sample_end.push_back(prefix_arr[i - 1]);
+        temp_div.push_back(div[i]);
+      } else {
+        ++cnt;
+      }
+      if (single_col[prefix_arr[i]]) { // allele 1
+        v.push_back(prefix_arr[i]);
+        div_v.push_back(q);
+        q = 0;
+      } else { // allele 0
+        u.push_back(prefix_arr[i]);
+        div_u.push_back(p);
+        p = 0;
+      }
+    }
+    temp_sample_end.push_back(prefix_arr[this->M - 1]);
+    // edge case
+    if (cnt > 0)
+      freq.push_back(cnt);
+
+    // populate dynamic data structures
+    for (unsigned int i = 0; i < freq.size(); ++i) {
+      temp_combined.push_back(freq[i]);
+      if (start_with_zero) {
+        if (i % 2 == 0) {
+          temp_zeros.push_back(freq[i]);
+        } else {
+          temp_ones.push_back(freq[i]);
+        }
+      } else {
+        if (i % 2 == 0) {
+          temp_ones.push_back(freq[i]);
+        } else {
+          temp_zeros.push_back(freq[i]);
+        }
+      }
+    }
+    assert(temp_combined.size() == temp_sample_beg.size());
+    assert(temp_combined.size() == temp_sample_end.size());
+    assert(temp_div.size() == temp_combined.size());
+    for (unsigned int i = 0; i < temp_sample_beg.size(); ++i) {
+      sites_where_sample_beg[temp_sample_beg.at(i)].push_back(col);
+      sites_where_sample_end[temp_sample_end.at(i)].push_back(col);
+    }
+    // build each column
+    dcpbwt_column coln((std::move(temp_zeros)), (std::move(temp_ones)), (std::move(temp_combined)),
+                       (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
+                       start_with_zero, u.size());
+    columns.emplace_back(coln);
+    assert(this->columns.size() == this->N + 1);
+    this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, div, verbose);
+    assert(col == N);
+    total_runs += freq.size();
+    cout << "Avg runs in panel = " << static_cast<float>(total_runs) / this->N << "\n";
+    bcf_hdr_destroy(hdr);
+    hts_close(fp);
+    bcf_destroy(rec);
   }
 
   // Build the reference panel
