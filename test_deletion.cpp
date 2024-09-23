@@ -2,7 +2,6 @@
 #include <getopt.h>
 #include <random>
 #include <fstream>
-#include <iomanip>
 #include <chrono>
 
 #include "dcpbwt.h"
@@ -46,8 +45,6 @@ void Test_Deletion(string &ref_vcf_input, string &output_log, bool verbose) {
   cout << "Total Deletion took: " << time_del << " s.\n";
   out.close();
 }
-
-
 
 int main(int argc, char **argv) {
   if (argc == 1) {
