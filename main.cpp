@@ -171,6 +171,7 @@ int main(int argc, char **argv) {
   std::string output_file;
   unsigned int length = 0;
   bool verbose = false;
+  bool build = false;
 
   int c = 0;
   while (true) {
@@ -184,7 +185,7 @@ int main(int argc, char **argv) {
       {nullptr, 0, nullptr, 0}};
 
     int option_index = 0;
-    c = getopt_long(argc, argv, "i:q:l:o:vh", long_options,
+    c = getopt_long(argc, argv, "i:q:l:o:bvh", long_options,
                     &option_index);
 
     if (c == -1) {
@@ -199,6 +200,8 @@ int main(int argc, char **argv) {
       case 'l':length = std::stoi(optarg);
         break;
       case 'o':output_file = optarg;
+        break;
+      case 'b':build = true;
         break;
       case 'v':verbose = true;
         break;
@@ -240,7 +243,12 @@ int main(int argc, char **argv) {
   }else if (query){
     Insertion_Into_RefPanel(ref_vcf_input, query_vcf_input, verbose);
   } else {
-    Insertion_Into_Empty_Panel(ref_vcf_input, verbose);
+    if (build){
+      DCPBWT dcpbwt(ref_vcf_input, verbose);
+      dcpbwt.PrintMemoryUsage(verbose);
+    }else{
+      Insertion_Into_Empty_Panel(ref_vcf_input, verbose);
+    }
   }
   return 0;
 }
