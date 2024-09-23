@@ -27,7 +27,6 @@ add_executable(test_delete test_deletion.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h)
 
-add_executable(packTest packTest.cpp)
 # ---- Download submodules ---- #
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -104,5 +103,4 @@ target_link_libraries(test_delete htslib -lz)
 add_dependencies(${EXE_NAME} hopscotch_map)
 add_dependencies(test_insert hopscotch_map)
 add_dependencies(test_delete hopscotch_map)
-add_dependencies(packTest hopscotch_map)
 
