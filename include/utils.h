@@ -130,18 +130,14 @@ inline void ReadQueryVCF(string &filename, vector<vector<bool>> &alleles) {
         alleles[2*hap_idx].push_back(static_cast<bool>(token[0] - '0'));
         alleles[2*hap_idx+ 1].push_back(static_cast<bool>(token[2] - '0'));
         ++hap_idx;
-//        single_col.push_back(static_cast<bool>(token[0] - '0'));
-//        single_col.push_back(static_cast<bool>(token[2] - '0'));
       }
       first = false;
-//      alleles.push_back(single_col);
     }
     inFile.close();
   } else {
     std::cerr << "Couldn't find : " << filename << "\n";
     exit(1);
   }
-//  std::cout << "M (# of haplotypes) = " << M << " : N (# of sites) = " << N << "\n";
 }
 
 inline void ReadVCF(string &filename, vector<vector<bool>> &alleles) {

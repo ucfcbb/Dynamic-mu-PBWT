@@ -31,7 +31,9 @@ class DCPBWT {
   // constructor
   DCPBWT(std::string ref_vcf_file, bool verbose) {
     // extract alleles from VCF
-    Build(ref_vcf_file.c_str(), verbose);
+    // Memory leak with htslib
+    // Build(ref_vcf_file.c_str(), verbose);
+    BuildFromVCF(ref_vcf_file, verbose);
     std::cout << "Total haplotypes: " << this->M << std::endl;
     std::cout << "Total sites: " << this->N << std::endl;
   }
@@ -1790,7 +1792,7 @@ class DCPBWT {
   void Build(const char* filename, bool verbose) {
     htsFile *fp = hts_open(filename, "rb");
     std::cout << "Building panel from: " << filename <<  std::endl;
-    if (fp == NULL) {
+    if (fp == nullptr) {
       std::cerr << "VCF file: " << filename << " not found!" << std::endl;
       return;
     }
@@ -2067,7 +2069,7 @@ class DCPBWT {
         iss >> token;
       }
       while (iss >> token) {
-        // M += 2;
+         this->M += 2;
         // individual_ids.push_back(token);
       }
       // go through all sites
@@ -2218,6 +2220,7 @@ class DCPBWT {
         freq.clear();
       }
 
+      this->N = col;
       // Handle for last column boundary
       packed_spsi temp_zeros;
       packed_spsi temp_ones;
@@ -2310,7 +2313,6 @@ class DCPBWT {
       this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, div, verbose);
       assert(col == N);
       total_runs += freq.size();
-      cout << "Phi support size (in bytes) = " << this->phi->size_in_bytes(verbose) << "\n";
       cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
 
       inFile.close();
