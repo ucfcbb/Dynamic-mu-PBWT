@@ -1,6 +1,3 @@
 [submodule "external/DYNAMIC"]
 	path = external/DYNAMIC
 	url = https://github.com/asanaullah2015/DYNAMIC.git
-[submodule "external/htslib"]
-	path = external/htslib
-	url = https://github.com/samtools/htslib.git
