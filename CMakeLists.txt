@@ -94,9 +94,9 @@ target_include_directories(test_delete PUBLIC external/DYNAMIC/include PUBLIC in
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
 
 target_link_libraries(${EXE_NAME} ${OpenMP_CXX_LIBRARIES})
-target_link_libraries(${EXE_NAME} htslib -lz)
-target_link_libraries(test_insert htslib -lz)
-target_link_libraries(test_delete htslib -lz)
+target_link_libraries(${EXE_NAME} htslib -lz -lpthread)
+target_link_libraries(test_insert htslib -lz -lpthread)
+target_link_libraries(test_delete htslib -lz -lpthread)
 
 add_dependencies(${EXE_NAME} hopscotch_map)
 add_dependencies(test_insert hopscotch_map)
