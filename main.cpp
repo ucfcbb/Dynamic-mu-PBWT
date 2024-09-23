@@ -116,7 +116,8 @@ void Insertion_Into_Empty_Panel(string &vcf_input, bool verbose) {
   cout << "Inserting...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryFile(vcf_input.c_str(), alleles);
+  ReadQueryVCF(vcf_input, alleles);
+//  ReadQueryFile(vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 
@@ -146,7 +147,8 @@ void Insertion_Into_RefPanel(string &ref_vcf_input, string &query_vcf_input, boo
   cout << "Inserting...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryFile(query_vcf_input.c_str(), alleles);
+  ReadQueryVCF(query_vcf_input, alleles);
+//  ReadQueryFile(query_vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 

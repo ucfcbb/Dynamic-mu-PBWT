@@ -20,9 +20,9 @@ using namespace std;
 
 class DCPBWT {
  public:
-  unsigned int M; // #haplotypes
-  unsigned int N; // #sites
-  std::vector<dcpbwt_column> columns;
+  unsigned int M=0; // #haplotypes
+  unsigned int N=0; // #sites
+  std::vector<dcpbwt_column> columns{};
   phi_ds *phi = nullptr;
 
   // default constructor
@@ -32,13 +32,13 @@ class DCPBWT {
   DCPBWT(std::string ref_vcf_file, bool verbose) {
     // extract alleles from VCF
     // Memory leak with htslib
-    // Build(ref_vcf_file.c_str(), verbose);
+//     Build(ref_vcf_file.c_str(), verbose);
     BuildFromVCF(ref_vcf_file, verbose);
     std::cout << "Total haplotypes: " << this->M << std::endl;
     std::cout << "Total sites: " << this->N << std::endl;
   }
   ~DCPBWT() {
-    delete phi;
+    delete this->phi;
   }
 
 
@@ -1762,6 +1762,12 @@ class DCPBWT {
   void PrintMemoryUsage(bool verbose=false){
     unsigned long long pa_da_spsi_size_bits = 0, run_info_spsi_size_bits = 0;
     for(unsigned int col=0; col <= this->N; ++col){
+      assert(this->columns[col].combined.size());
+      assert(this->columns[col].zeros.size());
+      assert(this->columns[col].ones.size());
+      assert(this->columns[col].pref_samples_beg.size());
+      assert(this->columns[col].pref_samples_end.size());
+      assert(this->columns[col].div_samples_beg.size());
       run_info_spsi_size_bits += this->columns[col].combined.bit_size();
       run_info_spsi_size_bits += this->columns[col].zeros.bit_size();
       run_info_spsi_size_bits += this->columns[col].ones.bit_size();
@@ -2073,20 +2079,20 @@ class DCPBWT {
         // individual_ids.push_back(token);
       }
       // go through all sites
-      vector<unsigned int> u, v;
-      vector<unsigned int> freq;
+      vector<unsigned int> u{}, v{};
+      vector<unsigned int> freq{};
       unsigned int total_runs = 0;
       unsigned int col = 0;
       int cnt = 1;
       bool prev_allele = false;
       // TODO: Possible optimization using sdsl int vec
-      vector<unsigned int> prefix_arr(M, 0);
+      vector<unsigned int> prefix_arr(this->M, 0);
       std::iota(prefix_arr.begin(), prefix_arr.end(), 0);
       // TODO: Possible optimization using sdsl int vec
-      vector<vector<unsigned int>> sites_where_sample_beg(M);
-      vector<vector<unsigned int>> sites_where_sample_end(M);
-      vector<unsigned int> div(M, 0);
-      vector<unsigned int> div_u, div_v;
+      vector<vector<unsigned int>> sites_where_sample_beg(this->M);
+      vector<vector<unsigned int>> sites_where_sample_end(this->M);
+      vector<unsigned int> div(this->M, 0);
+      vector<unsigned int> div_u{}, div_v{};
       unsigned int p = col + 1, q = col + 1;
 
       // read through the line and store in single_col
@@ -2104,12 +2110,12 @@ class DCPBWT {
           single_col.push_back(static_cast<bool>(token[2] - '0'));
         }
 
-        packed_spsi temp_zeros;
-        packed_spsi temp_ones;
-        packed_spsi temp_combined;
-        packed_spsi temp_sample_beg;
-        packed_spsi temp_sample_end;
-        packed_spsi temp_div;
+        packed_spsi temp_zeros{};
+        packed_spsi temp_ones{};
+        packed_spsi temp_combined{};
+        packed_spsi temp_sample_beg{};
+        packed_spsi temp_sample_end{};
+        packed_spsi temp_div{};
         bool start_with_zero = false;
         assert(single_col.size() == this->M);
         p = col + 1;
@@ -2165,7 +2171,6 @@ class DCPBWT {
         }
         temp_sample_end.push_back(prefix_arr[M - 1]);
 
-
         // edge case
         if (cnt > 0)
           freq.push_back(cnt);
@@ -2202,7 +2207,6 @@ class DCPBWT {
                            (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
                            start_with_zero, u.size());
         columns.emplace_back(coln);
-
         total_runs += freq.size();
 
         // next col prefix arr
@@ -2222,12 +2226,12 @@ class DCPBWT {
 
       this->N = col;
       // Handle for last column boundary
-      packed_spsi temp_zeros;
-      packed_spsi temp_ones;
-      packed_spsi temp_combined;
-      packed_spsi temp_sample_beg;
-      packed_spsi temp_sample_end;
-      packed_spsi temp_div;
+      packed_spsi temp_zeros{};
+      packed_spsi temp_ones{};
+      packed_spsi temp_combined{};
+      packed_spsi temp_sample_beg{};
+      packed_spsi temp_sample_end{};
+      packed_spsi temp_div{};
       bool start_with_zero = false;
       assert(single_col.size() == this->M);
       p = col + 1;
@@ -2307,13 +2311,13 @@ class DCPBWT {
                          (std::move(temp_sample_beg)), (std::move(temp_sample_end)), (std::move(temp_div)),
                          start_with_zero, u.size());
       columns.emplace_back(coln);
-      assert(columns.size() == N + 1);
+      assert(columns.size() == this->N + 1);
 
       // build phi data-structure
-      this->phi = new phi_ds(columns, M, N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, div, verbose);
+      this->phi = new phi_ds(columns, this->M, this->N, sites_where_sample_beg, sites_where_sample_end, prefix_arr, div, verbose);
       assert(col == N);
       total_runs += freq.size();
-      cout << "Avg runs = " << static_cast<float>(total_runs) / N << "\n";
+      cout << "Avg runs = " << static_cast<float>(total_runs) / this->N << "\n";
 
       inFile.close();
     } else {

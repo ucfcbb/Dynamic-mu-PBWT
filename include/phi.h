@@ -40,7 +40,14 @@ class phi_ds {
   std::vector<packed_spsi> phi_supp_lcp;
 
   phi_ds() = default;
-  virtual ~phi_ds() = default;
+  ~phi_ds(){
+    phi_vec.clear();
+    phi_inv_vec.clear();
+    phi_supp.clear();
+    phi_inv_supp.clear();
+    phi_supp_lcp.clear();
+    std::cout << "Destroying phi structure." << std::endl;
+  }
 
   /**
    * @brief constructor of the phi/phi_inv support data structure

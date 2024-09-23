@@ -21,7 +21,8 @@ void Test_Insertion_EmptyPanel(string &ref_vcf_input, string &output_log, bool v
   cout << "Testing Insertion...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryVCF(ref_vcf_input, alleles);
+//  ReadQueryVCF(ref_vcf_input, alleles);
+  ReadQueryFile(ref_vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 
@@ -56,7 +57,8 @@ void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, str
   cout << "Testing Insertion...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-  ReadQueryVCF(query_vcf_input, alleles);
+//  ReadQueryVCF(query_vcf_input, alleles);
+  ReadQueryFile(query_vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 
