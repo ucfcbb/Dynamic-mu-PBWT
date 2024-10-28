@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <fstream>
 #include <chrono>
+#include <random>
 
 #include "dcpbwt.h"
 #include "utils.h"
@@ -21,22 +22,32 @@ void Test_Insertion_EmptyPanel(string &ref_vcf_input, string &output_log, bool v
   cout << "Testing Insertion...\n";
   vector<vector<bool>> alleles;
   clock_t START_query_read = clock();
-//  ReadQueryVCF(ref_vcf_input, alleles);
-  ReadQueryFile(ref_vcf_input.c_str(), alleles);
+  ReadQueryVCF(ref_vcf_input, alleles);
+  //ReadQueryFile(ref_vcf_input.c_str(), alleles);
   auto time_read_query = (float) (clock() - START_query_read) / CLOCKS_PER_SEC;
   cout << "Time to read query alleles: " << time_read_query << " s\n";
 
   // go through all query haplotypes
   ofstream out;
   out.open(output_log);
-  vector<double> insert_per_hap;
+  out << "#No.\tHapID\tTime(ms)\tIndexMem(Bytes)\n";
+
+  // randomize order of insertion
+  std::random_device dev;
+  std::mt19937 rng(dev());
+  std::vector<int> insertion_order(alleles.size(), 0);
+  iota(insertion_order.begin(), insertion_order.end(), 0);
+  std::shuffle(insertion_order.begin(), insertion_order.end(), rng);
+
   clock_t START_INSERT_OVERALL = clock();
-  for (auto & allele : alleles) {
+  for (unsigned int i = 0; i < insertion_order.size(); ++i) {
     auto begin = std::chrono::high_resolution_clock::now();
-    dcpbwt.InsertSingleHaplotype(allele);
+    dcpbwt.InsertSingleHaplotype(alleles[insertion_order[i]]);
     auto end = std::chrono::high_resolution_clock::now();
     auto time_insert_per_hap = std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
-    out << time_insert_per_hap << "\n";
+
+    unsigned long long index_size = dcpbwt.get_memory_usage_bytes();
+    out << i+1 << "\t" << insertion_order[i] << "\t" << time_insert_per_hap << "\t" << index_size << "\n";
   }
   auto time_insert = (float) (clock() - START_INSERT_OVERALL) / CLOCKS_PER_SEC;
   cout << "Inserted " << alleles.size() << " haplotypes.\n";
@@ -51,7 +62,7 @@ void Test_Insertion_RefPanel(string &ref_vcf_input, string &query_vcf_input, str
   vector<double> insert_per_hap;
   out.open(output_log);
   clock_t START = clock();
-  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  DCPBWT dcpbwt(ref_vcf_input);
   auto time_build = (float) (clock() - START) / CLOCKS_PER_SEC;
   cout << "Time to build: " << time_build << " secs.\n";
   cout << "Testing Insertion...\n";

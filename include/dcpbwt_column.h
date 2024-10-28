@@ -40,6 +40,21 @@ class dcpbwt_column {
                                           start_with_zero(start_with_zero),
                                           num_zeros(num_zeros) {}
 
+  
+  unsigned long long get_size_bytes(){
+    unsigned long long spsi_bits = 0;
+    spsi_bits += zeros.bit_size();
+    spsi_bits += ones.bit_size();
+    spsi_bits += combined.bit_size();
+    spsi_bits += pref_samples_beg.bit_size();
+    spsi_bits += pref_samples_end.bit_size();
+    spsi_bits += div_samples_beg.bit_size();
+    spsi_bits += sizeof(bool);
+    spsi_bits += sizeof(unsigned int);
+
+    unsigned long long size = spsi_bits/8;
+    return size;
+  }
 };
 
 #endif //DCPBWT_COLUMN_H

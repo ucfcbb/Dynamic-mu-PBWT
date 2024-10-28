@@ -40,37 +40,21 @@ class phi_ds {
   std::vector<packed_spsi> phi_supp_lcp;
 
   phi_ds() = default;
-  ~phi_ds(){
-    phi_vec.clear();
-    phi_inv_vec.clear();
-    phi_supp.clear();
-    phi_inv_supp.clear();
-    phi_supp_lcp.clear();
-    std::cout << "Destroying phi structure." << std::endl;
-  }
+  ~phi_ds()=default;
 
-  /**
-   * @brief constructor of the phi/phi_inv support data structure
-   * @param cols vector of the columns of the RLPBWT
-   * @param panelbv random access data structure for the panel of RLPBWT
-   * @param last_pref last prefix array of the PBWT
-   * @param verbose bool for extra prints
+  /*
+   * constructor of the phi/phi_inv support data structure
    */
   phi_ds(vector<dcpbwt_column> &columns, unsigned int M,
          unsigned int N,
          std::vector<std::vector<unsigned int>> &site_where_samples_beg,
          std::vector<std::vector<unsigned int>> &site_where_samples_end,
          vector<unsigned int> &last_pref,
-         vector<unsigned int> &last_div,
-         bool verbose = false) {
-    // default value is the panel height
+         vector<unsigned int> &last_div) {
     this->total_haplotypes = M;
     this->total_sites = N;
-
-    // initialize panels and vectors of the data structure
     this->phi_vec = std::vector<suc_bv>(total_haplotypes);
     this->phi_inv_vec = std::vector<suc_bv>(total_haplotypes);
-
     this->phi_supp = std::vector<packed_spsi>(total_haplotypes);
     this->phi_inv_supp = std::vector<packed_spsi>(total_haplotypes);
     this->phi_supp_lcp = std::vector<packed_spsi>(total_haplotypes);
@@ -161,12 +145,6 @@ class phi_ds {
     }
   }
 
-  /**
-   * @brief phi function that return an optional
-   * @param pref prefix array value
-   * @param col current column index
-   * @return previous prefix array value at current column (if exists)
-   */
   std::optional<unsigned int> phi(unsigned int pref, unsigned int col) {
     // assert(col < this->total_sites);
     auto tmp_col = this->phi_vec[pref].rank1(col);
@@ -177,12 +155,6 @@ class phi_ds {
     return res;
   }
 
-  /**
-   * @brief phi_inv function that return an optional
-   * @param pref prefix array value
-   * @param col current column index
-   * @return next prefix array value at current column (if exists)
-  */
   std::optional<unsigned int> phi_inv(unsigned int pref, unsigned int col) {
     auto tmp_col = this->phi_inv_vec[pref].rank1(col);
     if (tmp_col == this->phi_inv_supp[pref].size()) {
@@ -225,138 +197,13 @@ class phi_ds {
     }
     // convert to bytes
     size /= 8;
+    size += sizeof(unsigned int);
+    size += sizeof(unsigned int);
     if (verbose) {
       std::cout << "phi support: " << size << " bytes\n";
     }
     return size;
   }
-
-  /**
-   * function to obtain size in megabytes of the phi/phi_inv support data
-   * structure
-   */
-  // double size_in_mega_bytes(bool verbose = false) {
-  //     double size_panels = 0;
-  //     double size_supp = 0;
-  //     for (unsigned int i = 0; i < this->phi_vec.size(); ++i) {
-  //         size_panels += sdsl::size_in_mega_bytes(phi_vec[i]);
-  //         size_panels += sdsl::size_in_mega_bytes(phi_inv_vec[i]);
-  //         size_panels += sdsl::size_in_mega_bytes(phi_rank[i]);
-  //         size_panels += sdsl::size_in_mega_bytes(phi_select[i]);
-  //         size_panels += sdsl::size_in_mega_bytes(phi_inv_rank[i]);
-  //         size_panels += sdsl::size_in_mega_bytes(phi_inv_select[i]);
-  //         size_supp += sdsl::size_in_mega_bytes(phi_supp[i]);
-  //         size_supp += sdsl::size_in_mega_bytes(phi_inv_supp[i]);
-  //         size_supp += sdsl::size_in_mega_bytes(phi_supp_l[i]);
-  //     }
-  //     double size = size_panels + size_supp;
-  //     if (verbose) {
-  //         std::cout << "phi panels: " << size_panels << " megabytes\n";
-  //         std::cout << "phi support: " << size_supp << " megabytes\n";
-  //         std::cout << "phi data structure (panels + support): " << size
-  //                   << " megabytes\n";
-  //     }
-  //     return size;
-  // }
-
-  /**
-   * @brief function to serialize the phi/phi_inv data structure object
-   * @param out std::ostream object to stream the serialization
-   * @return size of the serialization
-   */
-  // size_t serialize(std::ostream &out, sdsl::structure_tree_node *v = nullptr,
-  //                  const std::string &name = "") {
-  //     sdsl::structure_tree_node *child =
-  //             sdsl::structure_tree::add_child(v, name,
-  //                                             sdsl::util::class_name(
-  //                                                     *this));
-  //     size_t written_bytes = 0;
-  //     out.write((char *) &this->def, sizeof(this->def));
-  //     written_bytes += sizeof(this->def);
-  //     out.write((char *) &this->w, sizeof(this->w));
-  //     written_bytes += sizeof(this->w);
-  //
-  //     for (unsigned int i = 0; i < this->phi_vec.size(); i++) {
-  //         std::string label = "phi_vec_" + std::to_string(i);
-  //         written_bytes += this->phi_vec[i].serialize(out, child, label);
-  //     }
-  //
-  //     for (unsigned int i = 0; i < this->phi_inv_vec.size(); i++) {
-  //         std::string label = "phi_inv_vec_" + std::to_string(i);
-  //         written_bytes += this->phi_inv_vec[i].serialize(out, child, label);
-  //     }
-  //
-  //     for (unsigned int i = 0; i < this->phi_supp.size(); i++) {
-  //         std::string label = "phi_supp_" + std::to_string(i);
-  //         written_bytes += this->phi_supp[i].serialize(out, child, label);
-  //     }
-  //
-  //     for (unsigned int i = 0; i < this->phi_inv_supp.size(); i++) {
-  //         std::string label = "phi_inv_supp_" + std::to_string(i);
-  //         written_bytes += this->phi_inv_supp[i].serialize(out, child,
-  //                                                          label);
-  //     }
-  //
-  //     for (unsigned int i = 0; i < this->phi_supp_l.size(); i++) {
-  //         std::string label = "phi_supp_l_" + std::to_string(i);
-  //         written_bytes += this->phi_supp_l[i].serialize(out, child, label);
-  //     }
-  //     sdsl::structure_tree::add_size(child, written_bytes);
-  //     return written_bytes;
-  // }
-
-  /**
-   * @brief function to load the phi/phi_inv data structure object
-   * @param in std::istream object from which load the phi/phi_inv data
-   * structure object
-   */
-  // void load(std::istream &in) {
-  //     in.read((char *) &this->def, sizeof(this->def));
-  //     in.read((char *) &this->w, sizeof(this->w));
-  //
-  //     for (unsigned int i = 0; i < this->def; i++) {
-  //         auto s = new sdsl::sd_vector<>();
-  //         s->load(in);
-  //         this->phi_vec.emplace_back(*s);
-  //         delete s;
-  //     }
-  //     for (unsigned int i = 0; i < this->def; i++) {
-  //         auto s = new sdsl::sd_vector<>();
-  //         s->load(in);
-  //         this->phi_inv_vec.emplace_back(*s);
-  //         delete s;
-  //     }
-  //     for (unsigned int i = 0; i < this->def; i++) {
-  //         auto s = new sdsl::int_vector<>();
-  //         s->load(in);
-  //         this->phi_supp.emplace_back(*s);
-  //         delete s;
-  //     }
-  //     for (unsigned int i = 0; i < this->def; i++) {
-  //         auto s = new sdsl::int_vector<>();
-  //         s->load(in);
-  //         this->phi_inv_supp.emplace_back(*s);
-  //         delete s;
-  //     }
-  //     for (unsigned int i = 0; i < this->def; i++) {
-  //         auto s = new sdsl::int_vector<>();
-  //         s->load(in);
-  //         this->phi_supp_l.emplace_back(*s);
-  //         delete s;
-  //     }
-  //     for (auto &i: this->phi_vec) {
-  //         this->phi_rank.emplace_back(sdsl::sd_vector<>::rank_1_type(
-  //                 &i));
-  //         this->phi_select.emplace_back(sdsl::sd_vector<>::select_1_type(
-  //                 &i));
-  //     }
-  //     for (auto &i: this->phi_inv_vec) {
-  //         this->phi_inv_rank.emplace_back(sdsl::sd_vector<>::rank_1_type(
-  //                 &i));
-  //         this->phi_inv_select.emplace_back(sdsl::sd_vector<>::select_1_type(
-  //                 &i));
-  //     }
-  // }
 };
 
 #endif //PHI_H
