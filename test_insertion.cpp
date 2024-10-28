@@ -10,8 +10,8 @@
 void PrintHelp() {
   std::cout << "Usage: dcpbwt [options]\n" << std::endl;
   std::cout << "Options:" << std::endl;
-  std::cout << "  -i, --input ref <path>\t vcf file for panel" << std::endl;
-  std::cout << "  -q, --input query <path>\t vcf file for panel" << std::endl;
+  std::cout << "  -i, --ref <path>\t Ref vcf file for panel" << std::endl;
+  std::cout << "  -q, --query <path>\t Vcf file of haplotypes to be inserted into the ref vcf" << std::endl;
   std::cout << "  -o, --output log <path>\t txt file for logging the insertion times" << std::endl;
   std::cout << "  -v, --verbose <path>\t show detail information" << std::endl;
   std::cout << "  -h, --help\t show this help message and exit" << std::endl;

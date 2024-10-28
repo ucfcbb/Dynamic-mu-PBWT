@@ -17,10 +17,10 @@ add_executable(${EXE_NAME} main.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h
 )
-add_executable(test_insert test_insertion.cpp include/dcpbwt.h
+add_executable(insert test_insertion.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h)
-add_executable(test_delete test_deletion.cpp include/dcpbwt.h
+add_executable(delete test_deletion.cpp include/dcpbwt.h
         include/phi.h
         include/dcpbwt_column.h)
 
@@ -87,18 +87,18 @@ set_property(TARGET htslib PROPERTY IMPORTED_LOCATION ${htslib_LIB})
 target_include_directories(htslib INTERFACE ${htslib_SRC})
 
 target_include_directories(${EXE_NAME} PUBLIC external/DYNAMIC/include PUBLIC include)
-target_include_directories(test_insert PUBLIC external/DYNAMIC/include PUBLIC include)
-target_include_directories(test_delete PUBLIC external/DYNAMIC/include PUBLIC include)
+target_include_directories(insert PUBLIC external/DYNAMIC/include PUBLIC include)
+target_include_directories(delete PUBLIC external/DYNAMIC/include PUBLIC include)
 
 # DYNAMIC's hopscotch dependency
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/DYNAMIC/hopscotch_map-prefix/src/hopscotch_map/include)
 
 target_link_libraries(${EXE_NAME} ${OpenMP_CXX_LIBRARIES})
 target_link_libraries(${EXE_NAME} htslib -lz -lpthread)
-target_link_libraries(test_insert htslib -lz -lpthread)
-target_link_libraries(test_delete htslib -lz -lpthread)
+target_link_libraries(insert htslib -lz -lpthread)
+target_link_libraries(delete htslib -lz -lpthread)
 
 add_dependencies(${EXE_NAME} hopscotch_map)
-add_dependencies(test_insert hopscotch_map)
-add_dependencies(test_delete hopscotch_map)
+add_dependencies(insert hopscotch_map)
+add_dependencies(delete hopscotch_map)
 
