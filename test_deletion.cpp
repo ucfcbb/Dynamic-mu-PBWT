@@ -21,11 +21,17 @@ void PrintHelp() {
 void Test_Deletion(string &ref_vcf_input, string &output_log, bool verbose) {
   ofstream out;
   out.open(output_log);
+  out << "#No.\tHapID\tTime(ms)\tIndexMemBeforeDel(Bytes)\n";
+
   clock_t START = clock();
-  DCPBWT dcpbwt(ref_vcf_input, verbose);
+  DCPBWT dcpbwt(ref_vcf_input);
+  if (verbose){
+    dcpbwt.PrintMemoryUsage(verbose);
+  }
   auto time_build = (float) (clock() - START) / CLOCKS_PER_SEC;
   cout << "Time to build: " << time_build << " secs.\n";
   cout << "Testing Deletion...\n";
+
   std::random_device dev;
   std::mt19937 rng(dev());
   int cnt  = 1;
@@ -34,10 +40,12 @@ void Test_Deletion(string &ref_vcf_input, string &output_log, bool verbose) {
     std::uniform_int_distribution<std::mt19937::result_type> dist6(0,dcpbwt.M - 1); // distribution in range [1, 6]
     unsigned int target_hap_id = dist6(rng);
     auto begin = std::chrono::high_resolution_clock::now();
+    unsigned long long index_size = dcpbwt.get_memory_usage_bytes();
     dcpbwt.DeleteSingleHaplotype(target_hap_id);
     auto end = std::chrono::high_resolution_clock::now(); 
     auto del_per_hap = std::chrono::duration_cast<std::chrono::milliseconds>(end-begin).count();
-    out << del_per_hap << "\n";
+
+    out << cnt << "\t" << target_hap_id << "\t" << del_per_hap << "\t" << index_size << "\n";
     ++cnt;
   }
   dcpbwt.DeleteSingleHaplotype(0);

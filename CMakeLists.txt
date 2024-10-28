@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(OpenMP)
-set(EXE_NAME dcpbwt)
+set(EXE_NAME dmupbwt)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("Using ${CMAKE_BUILD_TYPE} mode ")
   add_compile_options(-Wall -Wextra -pedantic -O0)
