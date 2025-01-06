@@ -47,4 +47,5 @@ _deps
 CMakeUserPresets.json
 
 build/
+test_data/
 #external/

@@ -24,6 +24,8 @@ class dcpbwt_column {
   // TODO: For now keeping it for the sake of ease
   unsigned int num_zeros;
 
+  dcpbwt_column() {}
+
   dcpbwt_column(packed_spsi zeros,
                 packed_spsi ones,
                 packed_spsi combined,
